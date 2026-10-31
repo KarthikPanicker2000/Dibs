@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parley · private intake</title>
+<style>
+  :root { --bg: #0d1117; --panel: #161b22; --line: #2a3342; --text: #e6edf3; --muted: #8b98a9; --accent: #7c9cff; --gold: #f2c14e; --green: #3fb950; --red: #f85149; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 16px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 4px 0; }
+  .lock { background: #1f2a3d; border-radius: 10px; padding: 10px 12px; color: var(--muted); font-size: 14px; margin: 10px 0 14px; }
+  .item { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .name { font-weight: 700; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .val { font-size: 26px; font-weight: 800; min-width: 2ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .lbl { font-size: 12px; font-weight: 700; color: var(--muted); text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
+  details { margin-top: 4px; }
+  summary { color: var(--muted); font-size: 13px; cursor: pointer; }
+  input[type=number], textarea { width: 100%; background: #0b0f15; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 15px; margin-top: 6px; }
+  .bar { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; display: flex; gap: 8px; }
+  button { flex: 1; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 16px; font-weight: 700; }
+  button.primary { background: var(--accent); color: #0b1020; border: none; }
+  #msg { min-height: 22px; font-weight: 600; }
+  .ok { color: var(--green); } .bad { color: var(--red); }
+  .locked { opacity: .6; }
+</style>
+</head>
+<body>
+<div class="meta">Parley · your private agent</div>
+<h1 id="hello">Loading…</h1>
+<div class="lock">🔒 Your ratings stay inside this agent. Others only ever see a coarse NONE / WANT / STRONG, until the verdict is final.
+  <br>0 = won't take it · 1–4 = meh · 5–6 = want · 7–10 = really want. At most <b id="maxtop">3</b> items rated 9–10.</div>
+<div id="items"></div>
+<div id="msg"></div>
+<div class="bar">
+  <button id="demo">Auto-fill demo</button>
+  <button id="save" class="primary">Save privately</button>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const money = x => x == null ? "not appraised yet" : "$" + Number(x).toLocaleString("en-US");
+const label = r => r == 0 ? "won't take" : r <= 4 ? "meh" : r <= 6 ? "want" : "really want";
+let cat = null;
+
+async function load() {
+  const r = await fetch("catalog");
+  if (!r.ok) { $("hello").textContent = "Waiting for the organizer to load a scenario…"; setTimeout(load, 2000); return; }
+  cat = await r.json();
+  $("hello").textContent = `${cat.name}: ${cat.title}`;
+  $("maxtop").textContent = cat.max_top_ratings;
+  $("items").innerHTML = cat.items.map(it => {
+    const locked = it.locked_to && it.locked_to !== cat.you;
+    return `<div class="item ${locked ? "locked" : ""}" data-id="${it.id}">
+      <div class="top"><div><div class="name">${it.emoji || "📦"} ${esc(it.name)}</div>
+        <div class="meta">${money(it.market_value)}${it.locked_to ? " · 🔒 left by the will to " + esc(it.locked_to === cat.you ? "you" : it.locked_to) : ""}</div></div>
+        <div><div class="val" id="v-${it.id}">0</div><div class="lbl" id="l-${it.id}">won't take</div></div></div>
+      <input type="range" min="0" max="10" step="1" value="0" id="r-${it.id}">
+      <details><summary>Private max price & reason (optional)</summary>
+        <input type="number" min="0" step="50" placeholder="Most you'd pay (private)" id="m-${it.id}">
+        <textarea rows="2" placeholder="Why it matters to you (private; your agent may use the feeling, never numbers)" id="w-${it.id}"></textarea>
+      </details></div>`;
+  }).join("");
+  cat.items.forEach(it => $("r-" + it.id).oninput = () => update(it.id));
+  if (cat.has_prefs) $("msg").innerHTML = `<span class="ok">✔ Ratings already saved. You can change them until bidding starts.</span>`;
+}
+
+function update(id) {
+  const r = +$("r-" + id).value;
+  $("v-" + id).textContent = r;
+  $("l-" + id).textContent = label(r);
+  const top = cat.items.filter(it => +$("r-" + it.id).value >= 9).length;
+  $("msg").innerHTML = top > cat.max_top_ratings ? `<span class="bad">Too many 9–10 ratings (${top}/${cat.max_top_ratings}).</span>` : "";
+}
+
+$("demo").onclick = async () => {
+  const r = await fetch("demo_prefs");
+  if (!r.ok) { $("msg").innerHTML = `<span class="bad">No demo ratings for this person.</span>`; return; }
+  const d = await r.json();
+  cat.items.forEach(it => {
+    $("r-" + it.id).value = d.ratings[it.id] ?? 0;
+    $("m-" + it.id).value = d.max_prices[it.id] ?? "";
+    $("w-" + it.id).value = d.reasons[it.id] ?? "";
+    update(it.id);
+  });
+  $("msg").innerHTML = `<span class="ok">Demo ratings filled in. Tap Save.</span>`;
+};
+
+$("save").onclick = async () => {
+  const body = {ratings: {}, max_prices: {}, reasons: {}};
+  cat.items.forEach(it => {
+    body.ratings[it.id] = +$("r-" + it.id).value;
+    const m = $("m-" + it.id).value; if (m) body.max_prices[it.id] = +m;
+    const w = $("w-" + it.id).value.trim(); if (w) body.reasons[it.id] = w;
+  });
+  const r = await fetch("prefs", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  $("msg").innerHTML = r.ok ? `<span class="ok">✔ Saved inside your agent. Only NONE / WANT / STRONG will be shared.</span>`
+                            : `<span class="bad">${esc((await r.json()).detail)}</span>`;
+};
+load();
+</script>
+</body>
+</html>

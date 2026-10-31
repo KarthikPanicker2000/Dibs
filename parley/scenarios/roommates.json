@@ -1,0 +1,76 @@
+{
+  "id": "roommates",
+  "title": "Hillsborough St 3BR — lease ends Dec 15",
+  "kind": "roommates splitting shared stuff at move-out",
+  "will": "",
+  "notes": [
+    "Fictional sample data.",
+    "Ownership follows who paid: some things were bought jointly, some by one person.",
+    "The Appraiser estimates resale values from purchase price and age."
+  ],
+  "contest_threshold": 7,
+  "topup_pct": 0.5,
+  "max_top_ratings": 3,
+  "participants": [
+    {"id": "alex", "name": "Alex"},
+    {"id": "priya", "name": "Priya"},
+    {"id": "sam", "name": "Sam"}
+  ],
+  "items": [
+    {"id": "couch", "name": "Sectional couch", "category": "furniture", "emoji": "🛋️",
+     "description": "Grey L-shaped sectional, washable covers.", "purchase_price": 1170, "age_years": 3,
+     "shares": {"alex": 0.3333333333, "priya": 0.3333333333, "sam": 0.3333333334}},
+    {"id": "espresso", "name": "Espresso machine", "category": "kitchen", "emoji": "☕",
+     "description": "Breville Barista Express, descaled monthly.", "purchase_price": 500, "age_years": 1.6,
+     "shares": {"alex": 0.3333333333, "priya": 0.3333333333, "sam": 0.3333333334}},
+    {"id": "table", "name": "Dining table + 4 chairs", "category": "furniture", "emoji": "🪑",
+     "description": "Solid wood table with four chairs.", "purchase_price": 730, "age_years": 4,
+     "shares": {"alex": 0.3333333333, "priya": 0.3333333333, "sam": 0.3333333334}},
+    {"id": "tv", "name": "55\" TV", "category": "electronics", "emoji": "📺",
+     "description": "55-inch 4K smart TV.", "purchase_price": 600, "age_years": 2.5,
+     "shares": {"sam": 1.0}},
+    {"id": "mixer", "name": "Stand mixer", "category": "kitchen", "emoji": "🥣",
+     "description": "KitchenAid tilt-head stand mixer.", "purchase_price": 400, "age_years": 3,
+     "shares": {"priya": 1.0}},
+    {"id": "cookware", "name": "Cookware set", "category": "kitchen", "emoji": "🍳",
+     "description": "10-piece stainless set.", "purchase_price": 300, "age_years": 3,
+     "shares": {"alex": 0.5, "priya": 0.5}},
+    {"id": "rug", "name": "Rug", "category": "decor", "emoji": "🧶",
+     "description": "8x10 living room rug.", "purchase_price": 230, "age_years": 3,
+     "shares": {"alex": 0.3333333333, "priya": 0.3333333333, "sam": 0.3333333334}},
+    {"id": "airfryer", "name": "Air fryer", "category": "kitchen", "emoji": "🍟",
+     "description": "5-quart basket air fryer.", "purchase_price": 120, "age_years": 3,
+     "shares": {"alex": 0.3333333333, "priya": 0.3333333333, "sam": 0.3333333334}},
+    {"id": "vacuum", "name": "Old vacuum", "category": "other", "emoji": "🧹",
+     "description": "Works, mostly. Loud.", "purchase_price": 80, "age_years": 12,
+     "market_value": 0, "value_source": "manual", "confidence": "high",
+     "shares": {"alex": 0.3333333333, "priya": 0.3333333333, "sam": 0.3333333334}}
+  ],
+  "sale_estimates": {"rug": 50},
+  "demo_prefs": {
+    "alex": {
+      "ratings": {"couch": 9, "espresso": 10, "table": 2, "tv": 7, "mixer": 3, "cookware": 8, "rug": 1, "airfryer": 5, "vacuum": 0},
+      "max_prices": {},
+      "reasons": {
+        "couch": "I'm moving into a place with an empty living room.",
+        "espresso": "I'm the one who actually learned to pull a decent shot."
+      }
+    },
+    "priya": {
+      "ratings": {"couch": 8, "espresso": 2, "table": 8, "tv": 3, "mixer": 10, "cookware": 4, "rug": 3, "airfryer": 4, "vacuum": 0},
+      "max_prices": {},
+      "reasons": {
+        "couch": "My new apartment comes unfurnished.",
+        "table": "I host dinner for my lab every Friday."
+      }
+    },
+    "sam": {
+      "ratings": {"couch": 2, "espresso": 9, "table": 8, "tv": 6, "mixer": 0, "cookware": 0, "rug": 2, "airfryer": 8, "vacuum": 1},
+      "max_prices": {},
+      "reasons": {
+        "espresso": "Mornings before my 8 AM shift don't happen without it.",
+        "table": "I finally have a dining room."
+      }
+    }
+  }
+}

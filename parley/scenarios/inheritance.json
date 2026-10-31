@@ -1,0 +1,83 @@
+{
+  "id": "inheritance",
+  "title": "Estate of Margaret Lee",
+  "kind": "an inheritance among three adult siblings",
+  "will": "My watercolor painting of the lake house goes to my daughter Cara. Everything else is to be divided equally among my three children.",
+  "notes": [
+    "Fictional sample data.",
+    "The house is being sold separately and its proceeds split equally, so it isn't part of this split.",
+    "Every heir owns an equal 1/3 share of every item unless the will says otherwise."
+  ],
+  "contest_threshold": 7,
+  "topup_pct": 0.5,
+  "max_top_ratings": 3,
+  "participants": [
+    {"id": "ana", "name": "Ana"},
+    {"id": "ben", "name": "Ben"},
+    {"id": "cara", "name": "Cara"}
+  ],
+  "items": [
+    {"id": "ring", "name": "Diamond engagement ring", "category": "jewelry", "emoji": "💍",
+     "description": "Margaret's 1.2 ct engagement ring, platinum band.",
+     "market_value": 9000, "value_source": "Estate appraisal (sample)", "confidence": "high",
+     "shares": {"ana": 0.3333333333, "ben": 0.3333333333, "cara": 0.3333333334}},
+    {"id": "coins", "name": "Coin collection (Dad's)", "category": "collectibles", "emoji": "🪙",
+     "description": "Dad's silver dollar and proof-set collection, three albums.",
+     "market_value": 7000, "value_source": "Estate appraisal (sample)", "confidence": "medium",
+     "shares": {"ana": 0.3333333333, "ben": 0.3333333333, "cara": 0.3333333334}},
+    {"id": "piano", "name": "Upright piano", "category": "furniture", "emoji": "🎹",
+     "description": "1970s Yamaha upright, tuned last spring.",
+     "market_value": 6000, "value_source": "Estate appraisal (sample)", "confidence": "medium",
+     "shares": {"ana": 0.3333333333, "ben": 0.3333333333, "cara": 0.3333333334}},
+    {"id": "painting", "name": "Watercolor of the lake house", "category": "decor", "emoji": "🖼️",
+     "description": "Original watercolor of the family lake house. Specific bequest to Cara.",
+     "market_value": 4000, "value_source": "Estate appraisal (sample)", "confidence": "low",
+     "shares": {"cara": 1.0}, "locked_to": "cara"},
+    {"id": "car", "name": "2018 Honda CR-V", "category": "vehicle", "emoji": "🚙",
+     "description": "62k miles, one owner, clean title.",
+     "market_value": 18000, "value_source": "Estate appraisal (sample)", "confidence": "high",
+     "shares": {"ana": 0.3333333333, "ben": 0.3333333333, "cara": 0.3333333334}},
+    {"id": "dining", "name": "Dining set", "category": "furniture", "emoji": "🪑",
+     "description": "Oak table with six chairs.",
+     "market_value": 2500, "value_source": "Estate appraisal (sample)", "confidence": "medium",
+     "shares": {"ana": 0.3333333333, "ben": 0.3333333333, "cara": 0.3333333334}},
+    {"id": "clock", "name": "Grandfather clock", "category": "furniture", "emoji": "🕰️",
+     "description": "Walnut case, chimes on the hour.",
+     "market_value": 1500, "value_source": "Estate appraisal (sample)", "confidence": "medium",
+     "shares": {"ana": 0.3333333333, "ben": 0.3333333333, "cara": 0.3333333334}},
+    {"id": "china", "name": "China set", "category": "kitchen", "emoji": "🍽️",
+     "description": "Twelve place settings, floral pattern.",
+     "market_value": 800, "value_source": "Estate appraisal (sample)", "confidence": "low",
+     "shares": {"ana": 0.3333333333, "ben": 0.3333333333, "cara": 0.3333333334}}
+  ],
+  "sale_estimates": {"clock": 1200},
+  "demo_prefs": {
+    "ana": {
+      "ratings": {"ring": 9, "coins": 2, "piano": 10, "painting": 5, "car": 3, "dining": 6, "clock": 4, "china": 1},
+      "max_prices": {},
+      "reasons": {
+        "ring": "Mom wore it every day; I want to wear it at my wedding.",
+        "piano": "Mom taught me to play on this piano, and my kids are learning on it now.",
+        "dining": "Every Sunday dinner happened at that table."
+      }
+    },
+    "ben": {
+      "ratings": {"ring": 2, "coins": 9, "piano": 7, "painting": 4, "car": 7, "dining": 2, "clock": 3, "china": 0},
+      "max_prices": {},
+      "reasons": {
+        "coins": "Dad and I sorted those coins together every summer.",
+        "piano": "I'd love my daughter to keep practicing on Grandma's piano.",
+        "car": "My car just died and I need something reliable for the commute."
+      }
+    },
+    "cara": {
+      "ratings": {"ring": 10, "coins": 8, "piano": 1, "painting": 9, "car": 4, "dining": 3, "clock": 2, "china": 2},
+      "max_prices": {},
+      "reasons": {
+        "ring": "She promised it to me when I got engaged.",
+        "coins": "Dad started that collection the year I was born.",
+        "painting": "I was with her at the lake the summer she painted it."
+      }
+    }
+  }
+}

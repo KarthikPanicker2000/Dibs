@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parley</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --line: #2a3342; --text: #e6edf3; --muted: #8b98a9;
+    --accent: #7c9cff; --gold: #f2c14e; --green: #3fb950; --red: #f85149; --amber: #d29922; --violet: #b07cff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .logo { font-weight: 800; font-size: 22px; letter-spacing: .5px; }
+  .logo span { color: var(--accent); }
+  .title { font-size: 20px; font-weight: 600; }
+  .badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.gemma { color: #9be9a8; border-color: #2ea043; }
+  .badge.bad { color: var(--red); border-color: var(--red); }
+  .spacer { flex: 1; }
+  button, select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #0b1020; border: none; font-weight: 700; }
+  button:disabled { opacity: .45; cursor: default; }
+  .phases { display: flex; gap: 6px; padding: 10px 20px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .ph { flex: 1; min-width: 90px; text-align: center; padding: 6px 4px; border-radius: 6px; background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .ph.done { background: #1f3326; color: #9be9a8; }
+  .ph.now { background: var(--accent); color: #0b1020; }
+  .setup { padding: 10px 20px; display: flex; gap: 24px; flex-wrap: wrap; color: var(--muted); font-size: 14px; border-bottom: 1px solid var(--line); }
+  .will { font-style: italic; color: var(--text); max-width: 760px; }
+  .will b { font-style: normal; color: var(--gold); }
+  main { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.15fr) minmax(300px, 1fr); gap: 14px; padding: 14px 20px; }
+  .col { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-height: 0; }
+  .col h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .items { display: grid; gap: 8px; max-height: 66vh; overflow-y: auto; }
+  .card { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .card.live { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+  .emoji { font-size: 28px; text-align: center; }
+  .iname { font-weight: 600; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .chip { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #263041; color: var(--muted); white-space: nowrap; }
+  .chip.contested { background: #3d2a12; color: var(--gold); }
+  .chip.easy { background: #1f3326; color: #9be9a8; }
+  .chip.locked { background: #2b2140; color: var(--violet); }
+  .chip.unwanted { background: #2a2f37; color: var(--muted); }
+  .chip.won { background: var(--green); color: #07130a; }
+  .buckets { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .bk { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #222a36; color: var(--muted); }
+  .bk.STRONG { background: #3d2a12; color: var(--gold); }
+  .bk.WANT { background: #1d2c44; color: #8fb3ff; }
+  .feed { display: flex; flex-direction: column; gap: 6px; max-height: 66vh; overflow-y: auto; }
+  .ev { padding: 7px 10px; border-radius: 8px; background: var(--panel2); border-left: 3px solid var(--line); font-size: 14px; animation: pop .35s ease-out; }
+  .ev .who { font-weight: 700; margin-right: 6px; }
+  .ev.phase { border-left-color: var(--accent); font-weight: 600; }
+  .ev.win { border-left-color: var(--green); }
+  .ev.drop { border-left-color: var(--red); color: #ffb4ae; }
+  .ev.bid { border-left-color: var(--gold); }
+  .ev.filtered { border-left-color: var(--red); background: #2d1416; font-weight: 600; }
+  .ev.verdict { border-left-color: var(--violet); }
+  .ev.error { border-left-color: var(--red); color: var(--red); }
+  .ev.agent { border-left-color: #8fb3ff; font-style: italic; }
+  @keyframes pop { from { transform: translateY(-6px); background: #2a3a5c; } to { transform: none; } }   /* never hides text */
+  .people { display: grid; gap: 8px; margin-bottom: 14px; }
+  .person { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .prow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .pname { font-weight: 700; font-size: 16px; }
+  .pname a { color: var(--accent); font-size: 12px; font-weight: 500; margin-left: 6px; }
+  .bar { height: 10px; border-radius: 6px; background: #0b0f15; overflow: hidden; margin-top: 6px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #9fb7ff); transition: width .4s; }
+  .auction { background: var(--panel2); border: 1px solid var(--gold); border-radius: 12px; padding: 12px; text-align: center; }
+  .auction .big { font-size: 46px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .auction .aname { font-size: 18px; font-weight: 700; }
+  .bidders { display: flex; justify-content: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+  .bidder { padding: 6px 12px; border-radius: 8px; background: #1d2c44; font-weight: 700; }
+  .bidder.out { background: #2a1517; color: #ff9b94; text-decoration: line-through; }
+  .bidder.winner { background: var(--green); color: #07130a; }
+  .muted { color: var(--muted); }
+  section.verdict { margin: 0 20px 20px; background: var(--panel); border: 1px solid var(--violet); border-radius: 12px; padding: 14px; }
+  section.verdict h2 { margin: 0 0 8px; font-size: 20px; }
+  .transfers { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 12px; }
+  .tr { background: #1f2a3d; border-radius: 8px; padding: 8px 12px; font-weight: 700; font-size: 17px; }
+  .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .vcard { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .vcard h3 { margin: 0 0 6px; display: flex; justify-content: space-between; font-size: 18px; }
+  .ok { color: var(--green); } .bad { color: var(--amber); }
+  .vcard { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  td, th { padding: 3px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+  td:first-child, th:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; }
+  tr.got td { color: #9be9a8; font-weight: 700; }
+  .flash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 10; }
+  .flash.on { opacity: 1; }
+  .flash div { background: rgba(120, 18, 24, .92); border: 2px solid var(--red); color: #fff; font-size: 40px; font-weight: 800; padding: 22px 40px; border-radius: 16px; }
+  .err { color: var(--red); padding: 0 20px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } .items, .feed { max-height: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Par<span>ley</span></div>
+  <div class="title" id="title">…</div>
+  <span class="badge" id="llm"></span>
+  <div class="spacer"></div>
+  <select id="scenario"></select>
+  <button id="load">Load</button>
+  <button id="next">Next phase ▸</button>
+  <button id="run" class="primary">Run all ▸▸</button>
+</header>
+<div class="phases" id="phases"></div>
+<div class="setup" id="setup"></div>
+<div class="err" id="err"></div>
+<main>
+  <div class="col"><h2>Items</h2><div class="items" id="items"></div></div>
+  <div class="col"><h2>Live feed</h2><div class="feed" id="feed"></div></div>
+  <div class="col">
+    <h2>Participants</h2><div class="people" id="people"></div>
+    <div id="auction"></div>
+  </div>
+</main>
+<section class="verdict" id="verdict" hidden></section>
+<div class="flash" id="flash"><div>🛡️ message filtered</div></div>
+
+<script>
+const LABELS = {SETUP: "Setup", APPRAISE: "Appraise", INTAKE: "Intake", EASY_ALLOC: "Easy", NEGOTIATE: "Negotiate",
+                AUCTION: "Auction", JUDGE: "Verdict", REVEAL: "Reveal"};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const money = x => "$" + Number(x || 0).toLocaleString("en-US", {minimumFractionDigits: 0, maximumFractionDigits: 2});
+let S = null, seenEvents = 0, verdictShown = false, flashTimer = null;
+
+async function api(method, path) {
+  const r = await fetch(path, {method});
+  if (!r.ok) { const t = await r.text(); $("err").textContent = `${path}: ${t}`; throw new Error(t); }
+  $("err").textContent = "";
+  return r.json();
+}
+
+function agentLink(url) {
+  if (!url) return "";
+  try { const u = new URL(url); if (["localhost", "127.0.0.1"].includes(u.hostname)) u.hostname = location.hostname; return u.toString(); }
+  catch { return url; }
+}
+
+function nameOf(pid) { return (S.scenario.participants.find(p => p.id === pid) || {name: pid || "Unwanted pile"}).name; }
+
+function render() {
+  const s = S;
+  $("llm").textContent = "LLM: " + (s.llm_label || s.llm) + (s.llm_error ? " (failing, using mock answers)" : "");
+  $("llm").title = s.llm_error || "";
+  $("llm").className = "badge" + (s.llm_error ? " bad" : s.llm === "mock" ? "" : " gemma");
+  $("next").disabled = $("run").disabled = s.busy || s.phase === "REVEAL" || !s.scenario;
+  $("load").disabled = s.busy;
+  if (s.error) $("err").textContent = s.error;
+  if (!s.scenario) return;
+  $("title").textContent = s.scenario.title;
+  if ($("scenario").value !== s.scenario.id && document.activeElement !== $("scenario")) $("scenario").value = s.scenario.id;
+
+  const idx = s.phases.indexOf(s.phase);
+  $("phases").innerHTML = s.phases.map((p, i) =>
+    `<div class="ph ${i < idx ? "done" : i === idx ? "now" : ""}">${LABELS[p]}${i === idx && s.busy ? " …" : ""}</div>`).join("");
+
+  $("setup").innerHTML = (s.scenario.will ? `<div class="will"><b>The will:</b> “${esc(s.scenario.will)}”</div>` : "")
+    + `<div>${s.scenario.notes.map(esc).join("<br>")}</div>`;
+
+  renderItems(s); renderFeed(s); renderPeople(s); renderAuction(s); renderVerdict(s);
+}
+
+function itemStatus(s, it) {
+  const o = s.outcomes.find(o => o.item_id === it.id);
+  const cls = s.classes[it.id];
+  if (o && o.winner) {
+    const icon = {locked: "🔒 ", auction: "🏆 ", negotiated: "🤝 "}[o.method] || "";
+    const price = o.method === "auction" || o.method === "negotiated" ? " · " + money(o.price) : "";
+    return [`${icon}${nameOf(o.winner)}${price}`, o.method === "locked" ? "locked" : "won"];
+  }
+  if (o && !o.winner) return [s.scenario.sale_estimates[it.id] ? "sell ~" + money(s.scenario.sale_estimates[it.id]) : "donate", "unwanted"];
+  if (cls === "contested") return ["contested", "contested"];
+  if (it.locked_to) return ["🔒 will", "locked"];
+  return ["", ""];
+}
+
+function renderItems(s) {
+  const live = s.auction && s.auction.status !== "done" ? s.auction.item_id : null;
+  $("items").innerHTML = s.items.map(it => {
+    const [label, cls] = itemStatus(s, it);
+    const owners = Object.entries(it.shares).map(([p, v]) => `${nameOf(p)} ${Math.round(v * 100)}%`).join(", ");
+    const allEqual = new Set(Object.values(it.shares).map(v => v.toFixed(2))).size === 1 && Object.keys(it.shares).length === s.scenario.participants.length;
+    const bks = Object.keys(s.interest).length ? `<div class="buckets">${s.scenario.participants.map(p =>
+      `<span class="bk ${s.interest[p.id]?.[it.id] || ""}">${esc(p.name)}: ${s.interest[p.id]?.[it.id] || "?"}</span>`).join("")}</div>` : "";
+    return `<div class="card ${it.id === live ? "live" : ""}">
+      <div class="emoji">${it.emoji || "📦"}</div>
+      <div><div class="iname">${esc(it.name)}</div>
+        <div class="meta">${it.market_value != null ? money(it.market_value) : "not appraised"} · ${esc(it.value_source || "—")}${it.confidence ? " (" + esc(it.confidence) + ")" : ""}</div>
+        <div class="meta">Owners: ${allEqual ? "equal shares" : esc(owners)}</div>${bks}</div>
+      <div>${label ? `<span class="chip ${cls}">${esc(label)}</span>` : ""}</div></div>`;
+  }).join("");
+}
+
+let feedKey = "";
+function renderFeed(s) {
+  const evs = s.events;
+  const key = String(s.run_id);   // changes whenever a scenario is (re)loaded
+  if (key !== feedKey || evs.length < seenEvents) { feedKey = key; seenEvents = 0; $("feed").innerHTML = ""; }
+  if (evs.length === seenEvents) return;
+  const fresh = evs.slice(seenEvents);
+  const firstPaint = seenEvents === 0;
+  if (!firstPaint && fresh.some(e => e.kind === "filtered")) flash();
+  seenEvents = evs.length;
+  const agents = new Set(s.scenario.participants.map(p => p.id));
+  for (const e of fresh) {   // prepend only new events so old ones don't re-animate
+    const isAgent = e.kind === "message" && agents.has(e.actor);
+    const div = document.createElement("div");
+    div.className = `ev ${e.kind} ${isAgent ? "agent" : ""}`;
+    if (firstPaint) div.style.animation = "none";
+    div.innerHTML = (isAgent ? `<span class="who">${esc(nameOf(e.actor))}'s agent:</span>` : "") + esc(e.text);
+    $("feed").prepend(div);
+  }
+}
+
+function flash() {
+  $("flash").classList.add("on");
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => $("flash").classList.remove("on"), 1600);
+}
+
+function renderPeople(s) {
+  $("people").innerHTML = s.scenario.participants.map(p => {
+    const link = agentLink(p.agent_url);
+    const cap = s.caps[p.id], rem = s.remaining[p.id];
+    const credit = cap != null ? `<div class="bar"><i style="width:${Math.max(0, 100 * rem / cap)}%"></i></div>
+      <div class="meta">Spend cap: ${money(Math.max(0, rem))} left of ${money(cap)} (credits ${money(s.credits[p.id])})</div>`
+      : s.phase === "AUCTION" || s.phase === "JUDGE" || s.phase === "REVEAL" ? `<div class="meta">No contested items</div>` : "";
+    const intake = s.intake[p.id] ? `<span class="chip easy">✔ ratings in</span>` : `<span class="chip">waiting for intake</span>`;
+    const ok = s.verdict ? (s.verdict.attestations[p.id] ? `<span class="chip won">✅ fair</span>` : `<span class="chip contested">⚠️ below share</span>`) : intake;
+    return `<div class="person"><div class="prow"><div class="pname">${esc(p.name)}${link ? `<a href="${esc(link)}" target="_blank">agent ↗</a>` : ""}</div>${ok}</div>${credit}</div>`;
+  }).join("");
+}
+
+function renderAuction(s) {
+  const a = s.auction;
+  if (!a) { $("auction").innerHTML = s.phase === "AUCTION" ? `<div class="muted">Preparing the bidding war…</div>` : ""; return; }
+  const it = s.items.find(i => i.id === a.item_id);
+  const bidders = a.contestants.map(p => {
+    const cls = a.winner === p ? "winner" : a.dropped[p] != null ? "out" : "";
+    const note = a.winner === p ? " 🏆" : a.dropped[p] != null ? ` (out at ${money(a.dropped[p])})` : "";
+    return `<span class="bidder ${cls}">${esc(nameOf(p))}${note}</span>`;
+  }).join("");
+  const pct = Math.min(100, 100 * a.price / (a.market * 1.5));
+  $("auction").innerHTML = `<div class="auction">
+    <div class="muted">${a.status === "done" ? "SOLD" : "Bidding war · clock rising"}</div>
+    <div class="aname">${it.emoji || ""} ${esc(it.name)}</div>
+    <div class="big">${money(a.price)}</div>
+    <div class="meta">market value ${money(a.market)}</div>
+    <div class="bar"><i style="width:${pct}%;background:linear-gradient(90deg,#f2c14e,#ff8a3d)"></i></div>
+    <div class="bidders">${bidders}</div>
+    ${a.tiebreak ? `<div class="meta" style="margin-top:6px">🪙 Tiebreak: ${esc(a.tiebreak)}</div>` : ""}
+    ${s.auction_results.length > 1 || (s.auction_results.length && a.status !== "done") ? `<div class="meta" style="margin-top:8px">${s.auction_results.map(r => `${esc(s.items.find(i => i.id === r.item_id).name)} → ${esc(nameOf(r.winner))} ${money(r.price)}`).join(" · ")}</div>` : ""}
+  </div>`;
+}
+
+function renderVerdict(s) {
+  const v = s.verdict, el = $("verdict");
+  if (!v) { el.hidden = true; verdictShown = false; return; }
+  el.hidden = false;
+  const items = Object.fromEntries(s.items.map(i => [i.id, i]));
+  const sold = Object.entries(v.sold).map(([i, x]) => `${items[i].emoji} ${esc(items[i].name)} sold ~${money(x)} → split by ownership`);
+  const donated = v.outcomes.filter(o => !o.winner && !(o.item_id in v.sold)).map(o => `${items[o.item_id].emoji} ${esc(items[o.item_id].name)} donated`);
+  const cards = s.scenario.participants.map(p => {
+    const got = v.outcomes.filter(o => o.winner === p.id);
+    const r = s.reveal && s.reveal[p.id];
+    const net = v.transfers.reduce((t, x) => t + (x.payee === p.id ? x.amount : x.payer === p.id ? -x.amount : 0), 0);
+    let secret = "";
+    if (r) {
+      secret = `<table><tr><th>Secret inputs</th><th>rating</th><th>value</th><th>drop</th><th>paid</th></tr>` +
+        s.items.map(it => {
+          const o = v.outcomes.find(o => o.item_id === it.id);
+          const mine = o && o.winner === p.id;
+          return `<tr class="${mine ? "got" : ""}"><td>${it.emoji} ${esc(it.name)}</td><td>${r.ratings[it.id] ?? "–"}</td>
+            <td>${money(r.values[it.id])}</td><td>${r.drop_prices[it.id] != null ? money(r.drop_prices[it.id]) : ""}</td>
+            <td>${mine && o.method !== "locked" ? money(o.price) : ""}</td></tr>`;
+        }).join("") + `</table>` +
+        (r.max_prices && Object.keys(r.max_prices).length ? `<div class="meta">Max prices: ${Object.entries(r.max_prices).map(([i, x]) => esc(items[i].name) + " " + money(x)).join(", ")}</div>` : "") +
+        (r.fairness && r.fairness.got != null ? `<div class="meta">By ${esc(p.name)}'s own values: got ${money(r.fairness.got)} vs fair share ${money(r.fairness.proportional_share)}</div>` : "") +
+        (r.blocked_drafts.length ? `<div class="meta">🛡️ Blocked draft: “${esc(r.blocked_drafts[0])}”</div>` : "");
+    }
+    return `<div class="vcard"><h3>${esc(p.name)} <span class="${v.attestations[p.id] ? "ok" : "bad"}">${v.attestations[p.id] ? "✅" : "⚠️"}</span></h3>
+      <div><b>Gets:</b> ${got.length ? got.map(o => `${items[o.item_id].emoji} ${esc(items[o.item_id].name)}`).join(", ") : "no items"}</div>
+      <div><b>${net < 0 ? "Pays" : "Receives"}:</b> ${money(Math.abs(net))}</div>
+      <p class="muted" style="margin:8px 0 0">${esc(v.explanations[p.id] || "")}</p>${secret}</div>`;
+  }).join("");
+  el.innerHTML = `<h2>⚖️ Verdict${s.reveal ? " & reveal" : ""}</h2>
+    <div class="muted">${esc(v.summary)}</div>
+    <div class="transfers">${v.transfers.map(t => `<div class="tr">💸 ${esc(t.text)}</div>`).join("") || `<div class="tr">No money changes hands</div>`}</div>
+    ${sold.length || donated.length ? `<div class="meta" style="margin-bottom:10px">${[...sold, ...donated].join(" · ")}</div>` : ""}
+    <div class="vgrid">${cards}</div>
+    ${s.reveal ? `<p class="muted">Everyone can check: no winner paid more than their drop price, and every drop price stayed within that person's private value.</p>` : ""}
+    ${s.negotiation && s.negotiation.transcript ? `<h3 style="margin:14px 0 6px">🤝 Negotiation transcript (unsealed)</h3>` +
+      s.negotiation.transcript.filter(m => m.message).map(m => `<div class="ev ${m.type === "reject" ? "drop" : m.type === "accept" ? "win" : "bid"}" style="margin-bottom:6px">
+        <span class="who">R${m.round} · ${esc(nameOf(m.from))} ${esc(m.type)}${m.proposal ? ": " + Object.entries(m.proposal).map(([i, d]) => `${esc(items[i].name)} → ${esc(nameOf(d.winner))} ${money(d.price)}`).join(", ") : ""}</span><br>${esc(m.message)}</div>`).join("") : ""}`;
+  if (!verdictShown) { verdictShown = true; setTimeout(() => el.scrollIntoView({behavior: "smooth"}), 200); }
+}
+
+async function poll() {
+  try { S = await (await fetch("/state")).json(); render(); } catch (e) { /* server restarting */ }
+  setTimeout(poll, 500);
+}
+
+$("next").onclick = () => api("POST", "/next");
+$("run").onclick = () => api("POST", "/run");
+$("load").onclick = async () => { verdictShown = false; await api("POST", "/scenario/" + $("scenario").value); };
+fetch("/scenarios").then(r => r.json()).then(list => {
+  $("scenario").innerHTML = list.map(x => `<option value="${x}">${x}</option>`).join("");
+  poll();
+});
+</script>
+</body>
+</html>
