@@ -83,19 +83,23 @@ def is_mock() -> bool:
 _config_ok = True
 
 
-def _ask_gemma(prompt: str) -> str:
+def _ask_gemma(prompt: str, image: Path | None = None) -> str:
     # Gemma on the Gemini API may reject system_instruction, so instructions live in the prompt.
     global _config_ok
     from google.genai import types
+    contents = prompt
+    if image is not None:      # Gemma 4 is multimodal: photo first, then the instructions
+        mime = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
+        contents = [types.Part.from_bytes(data=image.read_bytes(), mime_type=mime), prompt]
     if _config_ok and THINKING:
         try:
             cfg = types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_level=THINKING))
-            return _gemma().models.generate_content(model=MODEL, contents=prompt, config=cfg).text or ""
+            return _gemma().models.generate_content(model=MODEL, contents=contents, config=cfg).text or ""
         except Exception as e:
             if "thinking" not in str(e).lower():
                 raise
             _config_ok = False     # model doesn't take a thinking level; call it plainly from now on
-    return _gemma().models.generate_content(model=MODEL, contents=prompt).text or ""
+    return _gemma().models.generate_content(model=MODEL, contents=contents).text or ""
 
 
 def _claude_env() -> dict[str, str]:
@@ -104,26 +108,34 @@ def _claude_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE", "ANTHROPIC_"))}
 
 
-def _ask_claude(prompt: str) -> str:
-    r = subprocess.run(
-        [CLAUDE_BIN, "-p", "--model", CLAUDE_MODEL, "--tools", "", "--strict-mcp-config",
-         "--no-session-persistence", "--output-format", "text"],
-        input=prompt, capture_output=True, text=True, timeout=120,
-        cwd=tempfile.gettempdir(), env=_claude_env())
+def _ask_claude(prompt: str, image: Path | None = None) -> str:
+    tools, cwd = "", tempfile.gettempdir()
+    with tempfile.TemporaryDirectory() as tmp:
+        if image is not None:
+            # copy the photo into a scratch folder and allow only the Read tool, scoped to that folder
+            cwd = tmp
+            shutil.copy(image, Path(tmp) / f"item{image.suffix.lower()}")
+            prompt = f"Look at the photo in ./item{image.suffix.lower()} (use the Read tool).\n" + prompt
+            tools = "Read"
+        cmd = [CLAUDE_BIN, "-p", "--model", CLAUDE_MODEL, "--tools", tools, "--strict-mcp-config",
+               "--no-session-persistence", "--output-format", "text"]
+        if tools:
+            cmd += ["--allowedTools", tools]
+        r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=120, cwd=cwd, env=_claude_env())
     if r.returncode != 0:
         raise RuntimeError(f"claude -p failed: {(r.stderr or r.stdout).strip()[-300:]}")
     return r.stdout
 
 
-def ask_text(prompt: str) -> str:
-    return _ask_claude(prompt) if MODE == "claude" else _ask_gemma(prompt)
+def ask_text(prompt: str, image: Path | None = None) -> str:
+    return _ask_claude(prompt, image) if MODE == "claude" else _ask_gemma(prompt, image)
 
 
-def ask_json(prompt: str, mock: dict, retries: int = 2) -> dict:
+def ask_json(prompt: str, mock: dict, retries: int = 2, image: Path | None = None) -> dict:
     if is_mock():
         return dict(mock)
     for _ in range(retries + 1):
-        text = ask_text(prompt)
+        text = ask_text(prompt, image) if image is not None else ask_text(prompt)
         m = re.search(r"\{.*\}", text, re.S)
         if m:
             try:
@@ -133,7 +145,7 @@ def ask_json(prompt: str, mock: dict, retries: int = 2) -> dict:
     raise ValueError("no JSON from model")
 
 
-def ask_json_or(prompt: str, mock: dict) -> tuple[dict, str]:
+def ask_json_or(prompt: str, mock: dict, image: Path | None = None) -> tuple[dict, str]:
     """Never raises. Returns (answer, source): source is MODE ('gemma'/'claude'), 'mock' or 'fallback'."""
     global disabled_reason, _disabled_at
     if is_mock():
@@ -141,7 +153,7 @@ def ask_json_or(prompt: str, mock: dict) -> tuple[dict, str]:
     if disabled_reason and time.time() - _disabled_at < RETRY_AFTER:
         return dict(mock), "fallback"
     try:
-        ans = ask_json(prompt, mock)
+        ans = ask_json(prompt, mock, image=image)
         disabled_reason = None
         return ans, MODE
     except Exception as e:  # network, quota, bad JSON, expired login: keep the demo moving

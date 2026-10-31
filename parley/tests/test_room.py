@@ -65,3 +65,26 @@ def test_unclaimed_seat_still_bids_automatically(agent):
     later = [{"item_id": "piano", "market": 6000, "contestants": ["ana", "ben"]}]
     agent.auction_start({"item_id": "ring", "market": 9000, "cap": 11250, "remaining": later, "manual": True})
     assert agent.drops["ring"] < 11250          # agent still saves budget for the piano
+
+
+def test_photo_upload_and_appraise(tmp_path, monkeypatch):
+    import base64
+    import io
+
+    import segno
+
+    import orchestrator.app as appmod
+    import orchestrator.appraiser as appr
+    monkeypatch.setattr(appmod, "IMAGE_DIR", tmp_path)
+    monkeypatch.setattr(appr, "IMAGE_DIR", tmp_path)
+    c = TestClient(appmod.app)
+    buf = io.BytesIO()
+    segno.make("chair").save(buf, kind="png")
+    r = c.post("/admin/upload", json={"data_url": "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()})
+    url = r.json()["url"]
+    assert r.status_code == 200 and url.startswith("/images/") and c.get(url).status_code == 200
+    assert c.post("/admin/upload", json={"data_url": "data:text/html;base64,PGI+"}).status_code == 400
+    # mock mode: value falls back to the depreciation formula (rounded to $10)
+    v = c.post("/admin/appraise", json={"name": "Chair", "category": "furniture", "purchase_price": 500,
+                                         "age_years": 2, "image": url}).json()
+    assert v["market_value"] == 320 and v["value_source"] == "depreciation formula"

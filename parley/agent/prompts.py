@@ -23,7 +23,7 @@ Fairness check for {name}: {pass_or_fail}.
 Write 2-3 warm, plain sentences: what they got, what they pay or receive, and why it's fair.
 Reply JSON only: {{"explanation": "..."}}"""
 
-APPRAISER = """You estimate used resale value (e.g. Facebook Marketplace) in USD.
+APPRAISER = """You estimate used resale value (e.g. Facebook Marketplace) in USD.{photo_note}
 Item: {name}. Category: {category}. Description: {description}.
 Bought for ${purchase_price}, {age_years} years ago.
 Reply with JSON only: {{"value": number, "confidence": "low|medium|high", "reasoning": "one sentence"}}"""

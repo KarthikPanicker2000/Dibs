@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Body, FastAPI, Header, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from .logic import AgentLogic
 
@@ -55,6 +55,17 @@ def create_app(logic: AgentLogic) -> FastAPI:
         if body.get("orch_url"):
             logic.orch_url = body["orch_url"]
         return logic.setup(body["scenario"], body.get("participant_id"), bool(body.get("reset")))
+
+    @app.get("/images/{name}")
+    def image(name: str):
+        # item photos relayed from the room, so the phone still only talks to its own agent
+        if not logic.orch_url:
+            raise HTTPException(404, "not connected to a room yet")
+        r = httpx.get(f"{logic.orch_url}/images/{name}", timeout=10)
+        if r.status_code != 200:
+            raise HTTPException(r.status_code, "no such image")
+        return Response(r.content, media_type=r.headers.get("content-type", "image/jpeg"),
+                        headers={"Cache-Control": "max-age=86400"})
 
     @app.get("/room_state")
     def room_state():

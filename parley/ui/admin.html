@@ -25,7 +25,10 @@
   table { width: 100%; border-collapse: collapse; } td, th { padding: 4px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
   th { color: var(--muted); font-weight: 600; font-size: 12px; } td input, td select { padding: 5px 6px; }
   #itemsTbl input[data-k=name] { min-width: 160px; } #itemsTbl input[type=number] { min-width: 76px; }
-  #itemsTbl select { min-width: 110px; } #itemsTbl input[data-k=emoji] { min-width: 44px; }
+  #itemsTbl select { min-width: 110px; }
+  .photo { display: inline-flex; width: 48px; height: 48px; border-radius: 8px; border: 1px dashed var(--line); align-items: center;
+           justify-content: center; cursor: pointer; overflow: hidden; font-size: 20px; vertical-align: middle; }
+  .photo img { width: 100%; height: 100%; object-fit: cover; } #itemsTbl input[data-k=emoji] { min-width: 44px; }
   .ok { color: var(--green); } .bad { color: var(--red); }
   .phase { display: inline-block; padding: 3px 9px; border-radius: 999px; background: var(--accent); color: #0b1020; font-weight: 700; }
   #err { color: var(--red); min-height: 18px; }
@@ -114,10 +117,13 @@ function loadIntoEditor(sc) {
 
 function renderItems() {
   const ps = people();
-  $("itemsTbl").innerHTML = `<tr><th></th><th>Name</th><th>Category</th><th>Value $</th><th>Bought $</th><th>Age</th>
+  $("itemsTbl").innerHTML = `<tr><th></th><th>Photo</th><th>Name</th><th>Category</th><th>Value $</th><th>Bought $</th><th>Age</th>
     ${ps.map(p => `<th>${esc(p.name)} %</th>`).join("")}<th>Will gives to</th><th>If unwanted, sells for $</th><th></th></tr>` +
     items.map((it, i) => `<tr>
       <td style="width:46px"><input data-i="${i}" data-k="emoji" value="${esc(it.emoji || "")}" maxlength="4"></td>
+      <td style="white-space:nowrap"><label class="photo" title="Upload or take a photo">${it.image ? `<img src="${esc(it.image)}">` : "📷"}
+        <input type="file" accept="image/*" data-up="${i}" hidden></label>
+        <button data-est="${i}" title="Estimate the value from the photo, purchase price and age">💲 Estimate</button></td>
       <td><input data-i="${i}" data-k="name" value="${esc(it.name || "")}"></td>
       <td><select data-i="${i}" data-k="category">${CATS.map(c => `<option ${c === it.category ? "selected" : ""}>${c}</option>`).join("")}</select></td>
       <td><input data-i="${i}" data-k="market_value" type="number" value="${it.market_value ?? ""}"></td>
@@ -131,6 +137,48 @@ function renderItems() {
   $("itemsTbl").querySelectorAll("[data-pct]").forEach(el => el.oninput = () => {
     const it = items[+el.dataset.i]; it.pct = it.pct || {}; it.pct[el.dataset.pct] = el.value; });
   $("itemsTbl").querySelectorAll("[data-del]").forEach(el => el.onclick = () => { items.splice(+el.dataset.del, 1); renderItems(); });
+  $("itemsTbl").querySelectorAll("[data-up]").forEach(el => el.onchange = () => el.files[0] && uploadPhoto(+el.dataset.up, el.files[0]));
+  $("itemsTbl").querySelectorAll("[data-est]").forEach(el => el.onclick = () => estimate(+el.dataset.est, el));
+}
+
+function shrink(file, max = 1024) {
+  // phone photos are big; send a 1024 px JPEG (plenty for valuation and the big screen)
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => reject(new Error("Couldn't read that image."));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function uploadPhoto(i, file) {
+  try {
+    $("saveMsg").textContent = "Uploading photo…";
+    const r = await api("POST", "/admin/upload", {data_url: await shrink(file)});
+    items[i].image = r.url;
+    renderItems();
+    $("saveMsg").innerHTML = `<span class="ok">Photo added. Tap 💲 Estimate to value it from the photo.</span>`;
+  } catch (e) { $("saveMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+
+async function estimate(i, btn) {
+  const it = items[i];
+  if (!(it.name || "").trim()) { $("saveMsg").innerHTML = `<span class="bad">Give the item a name first.</span>`; return; }
+  btn.disabled = true; btn.textContent = "…";
+  try {
+    const r = await api("POST", "/admin/appraise", {name: it.name, category: it.category || "other", description: it.description || "",
+      purchase_price: it.purchase_price === "" ? null : it.purchase_price, age_years: it.age_years === "" ? null : it.age_years, image: it.image || ""});
+    Object.assign(it, {market_value: r.market_value, value_source: r.value_source, confidence: r.confidence});
+    renderItems();
+    $("saveMsg").innerHTML = `${esc(it.name)}: <b>$${Number(r.market_value).toLocaleString()}</b> (${esc(r.value_source)}, ${esc(r.confidence)} confidence). ${esc(r.reasoning)}`
+      + (r.llm_error ? ` <span class="bad">${esc(r.llm)} is failing, so this used the formula.</span>` : "");
+  } catch (e) { $("saveMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; btn.disabled = false; btn.textContent = "💲 Estimate"; }
 }
 
 function buildScenario() {
@@ -146,7 +194,7 @@ function buildScenario() {
                        : Object.fromEntries(ps.map(p => [p.id, 1 / ps.length]));
     if (num(it.sale)) sale[id] = num(it.sale);
     const mv = num(it.market_value);
-    return {id, name: it.name.trim(), category: it.category || "other", emoji: it.emoji || "", description: it.description || "",
+    return {id, name: it.name.trim(), category: it.category || "other", emoji: it.emoji || "", image: it.image || "", description: it.description || "",
             market_value: mv, value_source: mv != null ? (it.value_source || "manual") : "",
             confidence: mv != null ? (it.confidence || "medium") : "low",
             purchase_price: num(it.purchase_price), age_years: num(it.age_years), shares, locked_to: it.locked || null};

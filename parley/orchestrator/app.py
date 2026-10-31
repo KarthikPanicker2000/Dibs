@@ -27,11 +27,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from agent import llm
 from core.allocation import auction_order, classify_all, compute_credits, spend_caps
 from core.auction import run_clock_auction, start_price
-from core.models import SCENARIO_DIR, Event, Outcome, Scenario, load_scenario
+from core.models import SCENARIO_DIR, Event, Item, Outcome, Scenario, load_scenario
 
 from . import juror
 from .agents import Agent, LocalAgent, RemoteAgent
-from .appraiser import appraise
+from .appraiser import IMAGE_DIR, appraise
 
 PHASES = ["SETUP", "APPRAISE", "INTAKE", "EASY_ALLOC", "NEGOTIATE", "AUCTION", "JUDGE", "REVEAL"]
 UI = Path(__file__).resolve().parent.parent / "ui" / "index.html"
@@ -557,6 +557,45 @@ def save_room(body: dict = Body(...)):
     except RuntimeError as e:
         raise HTTPException(409, str(e))
     return {"ok": True, "id": sc.id}
+
+
+@app.post("/admin/upload")
+def upload(body: dict = Body(...)):
+    """Item photo from the admin editor, sent as a data URL (already shrunk in the browser)."""
+    import base64
+    import uuid
+    m = re.match(r"data:image/(png|jpe?g|webp);base64,(.+)", str(body.get("data_url", "")), re.S)
+    if not m:
+        raise HTTPException(400, "Send a PNG, JPEG or WebP image.")
+    data = base64.b64decode(m.group(2))
+    if len(data) > 8_000_000:
+        raise HTTPException(413, "Image too large (8 MB max).")
+    ext = {"png": ".png", "webp": ".webp"}.get(m.group(1), ".jpg")
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    name = uuid.uuid4().hex[:12] + ext
+    (IMAGE_DIR / name).write_bytes(data)
+    return {"url": f"/images/{name}"}
+
+
+@app.get("/images/{name}")
+def image(name: str):
+    path = IMAGE_DIR / Path(name).name
+    if not path.exists():
+        raise HTTPException(404, "no such image")
+    mime = {".png": "image/png", ".webp": "image/webp"}.get(path.suffix, "image/jpeg")
+    return Response(path.read_bytes(), media_type=mime, headers={"Cache-Control": "max-age=86400"})
+
+
+@app.post("/admin/appraise")
+def appraise_item(body: dict = Body(...)):
+    """Value one item from the editor (photo + name + purchase price + age)."""
+    try:
+        item = Item.model_validate({"id": "x", "shares": {}, **{k: v for k, v in body.items() if k in Item.model_fields}})
+    except Exception as e:
+        raise HTTPException(400, f"Invalid item: {e}")
+    upd, why = appraise(item, force=True)
+    return {"market_value": upd.market_value, "value_source": upd.value_source, "confidence": upd.confidence,
+            "reasoning": why, "llm": llm.LABEL, "llm_error": llm.disabled_reason}
 
 
 @app.post("/admin/settings")

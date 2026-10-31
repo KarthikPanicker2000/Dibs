@@ -33,6 +33,7 @@ class Item(BaseModel):
     shares: dict[str, float]            # owner id -> share, sums to 1.0
     locked_to: str | None = None        # e.g. specific bequest in a will
     emoji: str = ""                     # extra: big-screen card icon
+    image: str = ""                     # extra: uploaded photo, served at /images/<file>
 
 
 class Scenario(BaseModel):

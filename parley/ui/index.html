@@ -195,7 +195,7 @@ function renderItems(s) {
     const bks = Object.keys(s.interest).length ? `<div class="buckets">${s.scenario.participants.map(p =>
       `<span class="bk ${s.interest[p.id]?.[it.id] || ""}">${esc(p.name)}: ${s.interest[p.id]?.[it.id] || "?"}</span>`).join("")}</div>` : "";
     return `<div class="card ${it.id === live ? "live" : ""}">
-      <div class="emoji">${it.emoji || "📦"}</div>
+      <div class="emoji">${it.image ? `<img src="${esc(it.image)}" style="width:40px;height:40px;object-fit:cover;border-radius:8px">` : it.emoji || "📦"}</div>
       <div><div class="iname">${esc(it.name)}</div>
         <div class="meta">${it.market_value != null ? money(it.market_value) : "not appraised"} · ${esc(it.value_source || "—")}${it.confidence ? " (" + esc(it.confidence) + ")" : ""}</div>
         <div class="meta">Owners: ${allEqual ? "equal shares" : esc(owners)}</div>${bks}</div>
@@ -255,7 +255,8 @@ function renderAuction(s) {
   const pct = Math.min(100, 100 * a.price / (a.market * 1.5));
   $("auction").innerHTML = `<div class="auction">
     <div class="muted">${a.status === "done" ? "SOLD" : "Bidding war · clock rising"}</div>
-    <div class="aname">${it.emoji || ""} ${esc(it.name)}</div>
+    ${it.image ? `<img src="${esc(it.image)}" style="max-width:100%;max-height:180px;border-radius:10px;margin:6px 0">` : ""}
+    <div class="aname">${it.image ? "" : it.emoji || ""} ${esc(it.name)}</div>
     <div class="big">${money(a.price)}</div>
     <div class="meta">market value ${money(a.market)}</div>
     <div class="bar"><i style="width:${pct}%;background:linear-gradient(90deg,#f2c14e,#ff8a3d)"></i></div>

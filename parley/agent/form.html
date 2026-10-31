@@ -107,7 +107,8 @@ function buildForm() {
   $("items").innerHTML = cat.items.map(it => {
     const lockedOther = it.locked_to && it.locked_to !== cat.you;
     return `<div class="item ${lockedOther ? "locked" : ""}">
-      <div class="top"><div><div class="name">${it.emoji || "📦"} ${esc(it.name)}</div>
+      ${it.image ? `<img src="${esc(it.image)}" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-bottom:6px">` : ""}
+      <div class="top"><div><div class="name">${it.image ? "" : it.emoji || "📦"} ${esc(it.name)}</div>
         <div class="meta">${money(it.market_value)}${it.locked_to ? " · 🔒 the will gives this to " + esc(it.locked_to === cat.you ? "you" : it.locked_to) : ""}</div></div>
         <div><div class="val" id="v-${it.id}">0</div><div class="lbl" id="l-${it.id}">won't take</div></div></div>
       <input type="range" min="0" max="10" step="1" value="0" id="r-${it.id}">
@@ -204,7 +205,8 @@ function renderLive() {
              : `<div class="center meta">${a.status === "done" ? "SOLD" : "Clock rising"}</div>`;
   if (el.dataset.item !== a.item_id) { el.dataset.item = a.item_id; bidMsg = ""; }
   if (!$("liveInfo")) el.innerHTML = `<h2>Bidding war</h2><div id="liveInfo"></div><div id="liveCtl"></div><div id="bidmsg" class="center"></div><div id="liveCap"></div>`;
-  $("liveInfo").innerHTML = `${head}<div class="center name">${it.emoji || ""} ${esc(it.name)} · market ${money(a.market)}</div>
+  $("liveInfo").innerHTML = `${head}${it.image ? `<img src="${esc(it.image)}" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin:6px 0">` : ""}
+    <div class="center name">${it.image ? "" : it.emoji || ""} ${esc(it.name)} · market ${money(a.market)}</div>
     <div class="price">${money(a.price)}</div>${status}`;
   // buttons are only rebuilt when they change, so a tap never lands on a button being replaced
   if ($("liveCtl").dataset.html !== controls) { $("liveCtl").dataset.html = controls; $("liveCtl").innerHTML = controls; }
