@@ -88,3 +88,21 @@ def test_photo_upload_and_appraise(tmp_path, monkeypatch):
     v = c.post("/admin/appraise", json={"name": "Chair", "category": "furniture", "purchase_price": 500,
                                          "age_years": 2, "image": url}).json()
     assert v["market_value"] == 320 and v["value_source"] == "depreciation formula"
+
+
+def test_self_named_join_renames_seat(monkeypatch):
+    import orchestrator.app as appmod
+    from orchestrator.agents import LocalAgent
+
+    e = appmod.Engine(agent_urls=[], tick_delay=0, phase_pause=0)
+    e.load("roommates")
+    for pid, a in e.agents.items():
+        a.url = f"http://localhost:800{'123'[list(e.agents).index(pid)]}"
+    monkeypatch.setattr(appmod, "engine", e)
+    c = TestClient(appmod.app)
+    r = c.get("/join/priya", params={"name": "  Karthik "}, follow_redirects=False)
+    assert r.status_code == 307
+    assert e.name("priya") == "Karthik" and e.agents["priya"].logic.name == "Karthik"
+    c.get("/join/sam", params={"name": "karthik"}, follow_redirects=False)
+    assert e.name("sam") == "karthik (sam)"                        # names stay distinct
+    assert isinstance(e.agents["alex"], LocalAgent)

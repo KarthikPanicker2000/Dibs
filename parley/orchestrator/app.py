@@ -130,6 +130,16 @@ class Engine:
         for n in sc.notes:
             self.emit("message", n)
 
+    def rename(self, pid: str, name: str):
+        """Self-named rooms: the person picks their display name when they join (id stays the same)."""
+        taken = {p.name.lower() for p in self.scenario.participants if p.id != pid}
+        if name.lower() in taken:
+            name = f"{name} ({pid})"
+        with self.lock:
+            people = [p.model_copy(update={"name": name}) if p.id == pid else p for p in self.scenario.participants]
+            self.scenario = self.scenario.model_copy(update={"participants": people})
+        self.agents[pid].setup(self.scenario)      # same room + seat: keeps the person's ratings
+
     def push_catalog(self):
         for a in self.agents.values():
             a.setup(self.scenario)
@@ -440,6 +450,7 @@ class Engine:
                 "llm": llm.MODE, "llm_label": llm.LABEL, "llm_error": llm.disabled_reason,
                 "scenario": None if sc is None else {
                     "id": sc.id, "title": sc.title, "kind": sc.kind, "will": sc.will, "notes": sc.notes,
+                    "self_named": sc.self_named,
                     "topup_pct": sc.topup_pct, "sale_estimates": sc.sale_estimates,
                     "participants": [{"id": p.id, "name": p.name,
                                       "agent_url": getattr(self.agents.get(p.id), "url", None)} for p in sc.participants],
@@ -516,10 +527,13 @@ def join_page():
 
 
 @app.get("/join/{pid}")
-def join(pid: str, request: Request):
+def join(pid: str, request: Request, name: str = ""):
     a = engine.agents.get(pid)
     if not a or not a.url:
         raise HTTPException(404, "That seat has no phone agent (start more agent slots in run_local.sh).")
+    name = re.sub(r"\s+", " ", name).strip()[:30]
+    if name and engine.scenario.self_named:
+        engine.rename(pid, name)
     engine.joined[pid] = True
     engine.emit("message", f"📱 {engine.name(pid)} joined from a phone.")
     base = public_base(request)

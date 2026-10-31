@@ -49,6 +49,7 @@ class Scenario(BaseModel):
     will: str = ""                # will text, shown on screen
     notes: list[str] = []         # one-liners for the setup screen
     sale_estimates: dict[str, float] = {}   # unwanted item -> expected sale proceeds; missing => donate
+    self_named: bool = False      # people type their own name when they join (seat names are placeholders)
 
 
 # ---- private, lives only inside an agent ----
