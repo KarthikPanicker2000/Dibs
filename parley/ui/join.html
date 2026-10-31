@@ -16,7 +16,16 @@
 <div class="meta">Parley · join the room</div>
 <h1 id="title">Loading…</h1>
 <div id="will"></div>
-<p class="meta">Who are you? Tap your name. Your phone then talks only to your own private agent.</p>
+<div id="openBox" hidden>
+  <p class="meta">Type your name to take a seat. Your phone then talks only to your own private agent.</p>
+  <form id="joinForm" style="display:flex;gap:8px">
+    <input id="myname" maxlength="30" placeholder="Your name" autocomplete="given-name" required
+      style="flex:1;min-width:0;box-sizing:border-box;padding:14px;font-size:18px;border-radius:12px;border:1px solid #2a3342;background:#0b0f15;color:#e6edf3">
+    <button style="padding:14px 20px;font-size:18px;font-weight:700;border-radius:12px;border:none;background:#7c9cff;color:#0b1020">Join</button>
+  </form>
+  <div id="joinErr" style="color:#f85149;min-height:22px;margin-top:6px"></div>
+</div>
+<p class="meta" id="how">Who are you? Tap your name. Your phone then talks only to your own private agent.</p>
 <div id="seats"></div>
 <script>
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -25,10 +34,23 @@ async function load() {
   if (!s.scenario) { setTimeout(load, 2000); return; }
   document.getElementById("title").textContent = s.scenario.title;
   document.getElementById("will").innerHTML = s.scenario.will ? `<div class="will">${esc(s.scenario.will)}</div>` : "";
+  const open = s.scenario.open_seats;
+  document.getElementById("openBox").hidden = !open;
+  document.getElementById("how").textContent = open
+    ? (s.scenario.participants.length ? "Already joined? Type the same name, or tap it:" : "")
+    : "Who are you? Tap your name. Your phone then talks only to your own private agent.";
   document.getElementById("seats").innerHTML = s.scenario.participants.map(p =>
     `<a class="seat" href="/join/${encodeURIComponent(p.id)}">${esc(p.name)}<span>${p.agent_url ? (s.joined[p.id] ? "joined · tap to rejoin" : "open seat") : "no phone agent"}</span></a>`).join("");
 }
+document.getElementById("joinForm").onsubmit = async e => {
+  e.preventDefault();
+  const r = await fetch("/join", {method: "POST", headers: {"Content-Type": "application/json"},
+                                  body: JSON.stringify({name: document.getElementById("myname").value})});
+  const j = await r.json().catch(() => ({}));
+  if (r.ok) location.href = j.url; else document.getElementById("joinErr").textContent = j.detail || "Couldn't join.";
+};
 load();
+setInterval(load, 3000);   // new seats show up as people join
 </script>
 </body>
 </html>

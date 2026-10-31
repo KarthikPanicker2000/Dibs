@@ -1,0 +1,114 @@
+{
+  "id": "moveout-open",
+  "title": "Move-out (open room)",
+  "kind": "roommates splitting shared stuff at move-out",
+  "will": "",
+  "notes": [
+    "Scan the QR and type your name to take a seat.",
+    "Everyone who joins owns an equal share of every item.",
+    "The Appraiser estimates resale values from purchase price and age."
+  ],
+  "contest_threshold": 7,
+  "topup_pct": 0.5,
+  "max_top_ratings": 3,
+  "participants": [],
+  "items": [
+    {
+      "id": "couch",
+      "name": "Sectional couch",
+      "category": "furniture",
+      "emoji": "🛋️",
+      "description": "Grey L-shaped sectional, washable covers.",
+      "purchase_price": 1170,
+      "age_years": 3,
+      "shares": {}
+    },
+    {
+      "id": "espresso",
+      "name": "Espresso machine",
+      "category": "kitchen",
+      "emoji": "☕",
+      "description": "Breville Barista Express, descaled monthly.",
+      "purchase_price": 500,
+      "age_years": 1.6,
+      "shares": {}
+    },
+    {
+      "id": "table",
+      "name": "Dining table + 4 chairs",
+      "category": "furniture",
+      "emoji": "🪑",
+      "description": "Solid wood table with four chairs.",
+      "purchase_price": 730,
+      "age_years": 4,
+      "shares": {}
+    },
+    {
+      "id": "tv",
+      "name": "55\" TV",
+      "category": "electronics",
+      "emoji": "📺",
+      "description": "55-inch 4K smart TV.",
+      "purchase_price": 600,
+      "age_years": 2.5,
+      "shares": {}
+    },
+    {
+      "id": "mixer",
+      "name": "Stand mixer",
+      "category": "kitchen",
+      "emoji": "🥣",
+      "description": "KitchenAid tilt-head stand mixer.",
+      "purchase_price": 400,
+      "age_years": 3,
+      "shares": {}
+    },
+    {
+      "id": "cookware",
+      "name": "Cookware set",
+      "category": "kitchen",
+      "emoji": "🍳",
+      "description": "10-piece stainless set.",
+      "purchase_price": 300,
+      "age_years": 3,
+      "shares": {}
+    },
+    {
+      "id": "rug",
+      "name": "Rug",
+      "category": "decor",
+      "emoji": "🧶",
+      "description": "8x10 living room rug.",
+      "purchase_price": 230,
+      "age_years": 3,
+      "shares": {}
+    },
+    {
+      "id": "airfryer",
+      "name": "Air fryer",
+      "category": "kitchen",
+      "emoji": "🍟",
+      "description": "5-quart basket air fryer.",
+      "purchase_price": 120,
+      "age_years": 3,
+      "shares": {}
+    },
+    {
+      "id": "vacuum",
+      "name": "Old vacuum",
+      "category": "other",
+      "emoji": "🧹",
+      "description": "Works, mostly. Loud.",
+      "purchase_price": 80,
+      "age_years": 12,
+      "market_value": 0,
+      "value_source": "manual",
+      "confidence": "high",
+      "shares": {}
+    }
+  ],
+  "sale_estimates": {
+    "rug": 50
+  },
+  "open_seats": true
+}

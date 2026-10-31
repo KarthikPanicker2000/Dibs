@@ -71,7 +71,8 @@
       <label>Title</label><input id="title">
       <label>Instructions everyone sees (rules, the will, deadlines)</label><textarea id="will"></textarea>
       <label>Extra notes (one per line)</label><textarea id="notes"></textarea>
-      <label>People (comma-separated names; each gets a phone seat)</label><input id="names" placeholder="Ana, Ben, Cara">
+      <label><input type="checkbox" id="openSeats" style="width:auto"> <b>Open room</b>: no names needed. People scan the QR, type their name and get a seat; everyone owns an equal share of every item.</label>
+      <div id="namesBox"><label>People (comma-separated names; each gets a phone seat)</label><input id="names" placeholder="Ana, Ben, Cara"></div>
       <div class="row">
         <div><label>Rating needed to contest</label><input id="thr" type="number" min="5" max="10"></div>
         <div><label>Top-up over credits (%)</label><input id="topup" type="number" min="0" max="200"></div>
@@ -107,6 +108,7 @@ function loadIntoEditor(sc) {
   editId = sc.id && sc.id.startsWith("room-") ? sc.id : null;
   $("title").value = sc.title || ""; $("will").value = sc.will || ""; $("notes").value = (sc.notes || []).join("\n");
   $("names").value = sc.participants.map(p => p.name).join(", ");
+  $("openSeats").checked = !!sc.open_seats;
   $("thr").value = sc.contest_threshold ?? 7; $("topup").value = Math.round((sc.topup_pct ?? 0.5) * 100); $("maxtop").value = sc.max_top_ratings ?? 3;
   const name = Object.fromEntries(sc.participants.map(p => [p.id, p.name]));
   items = sc.items.map(it => ({...it, sale: (sc.sale_estimates || {})[it.id] ?? "",
@@ -116,7 +118,9 @@ function loadIntoEditor(sc) {
 }
 
 function renderItems() {
-  const ps = people();
+  const open = $("openSeats").checked;
+  $("namesBox").hidden = open;
+  const ps = open ? [] : people();
   $("itemsTbl").innerHTML = `<tr><th></th><th>Photo</th><th>Name</th><th>Category</th><th>Value $</th><th>Bought $</th><th>Age</th>
     ${ps.map(p => `<th>${esc(p.name)} %</th>`).join("")}<th>Will gives to</th><th>If unwanted, sells for $</th><th></th></tr>` +
     items.map((it, i) => `<tr>
@@ -182,8 +186,9 @@ async function estimate(i, btn) {
 }
 
 function buildScenario() {
-  const ps = people();
-  if (!ps.length) throw new Error("Add at least one person.");
+  const open = $("openSeats").checked;
+  const ps = open ? [] : people();
+  if (!ps.length && !open) throw new Error("Add at least one person, or make it an open room.");
   const num = v => v === "" || v == null ? null : Number(v);
   const sale = {};
   const outItems = items.filter(it => (it.name || "").trim()).map((it, k) => {
@@ -191,7 +196,7 @@ function buildScenario() {
     let shares = Object.fromEntries(ps.map(p => [p.id, Number(it.pct?.[p.id]) || 0]).filter(([, v]) => v > 0));
     const total = Object.values(shares).reduce((a, b) => a + b, 0);
     shares = total > 0 ? Object.fromEntries(Object.entries(shares).map(([p, v]) => [p, v / total]))
-                       : Object.fromEntries(ps.map(p => [p.id, 1 / ps.length]));
+                       : Object.fromEntries(ps.map(p => [p.id, 1 / ps.length]));   // open rooms: {} until people join
     if (num(it.sale)) sale[id] = num(it.sale);
     const mv = num(it.market_value);
     return {id, name: it.name.trim(), category: it.category || "other", emoji: it.emoji || "", image: it.image || "", description: it.description || "",
@@ -202,13 +207,14 @@ function buildScenario() {
   if (!outItems.length) throw new Error("Add at least one item.");
   return {id: editId || "", title: $("title").value.trim() || "Untitled room", kind: "a shared-items split",
           will: $("will").value.trim(), notes: $("notes").value.split("\n").map(s => s.trim()).filter(Boolean),
-          participants: ps, items: outItems, sale_estimates: sale,
+          participants: ps, items: outItems, sale_estimates: sale, open_seats: open,
           contest_threshold: Number($("thr").value) || 7, topup_pct: (Number($("topup").value) || 0) / 100, max_top_ratings: Number($("maxtop").value) || 3};
 }
 
 $("names").onchange = renderItems;
 $("addItem").onclick = () => { items.push({emoji: "📦", name: "", category: "other", pct: {}}); renderItems(); };
-$("blank").onclick = () => loadIntoEditor({title: "", will: "", notes: [], participants: [{id: "alex", name: "Alex"}, {id: "sam", name: "Sam"}], items: []});
+$("blank").onclick = () => loadIntoEditor({title: "", will: "", notes: [], participants: [], items: [], open_seats: true});
+$("openSeats").onchange = renderItems;
 $("loadTpl").onclick = async () => loadIntoEditor(await api("GET", "/scenario_raw/" + $("tpl").value));
 $("save").onclick = async () => {
   try {

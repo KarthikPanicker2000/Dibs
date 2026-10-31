@@ -88,3 +88,28 @@ def test_photo_upload_and_appraise(tmp_path, monkeypatch):
     v = c.post("/admin/appraise", json={"name": "Chair", "category": "furniture", "purchase_price": 500,
                                          "age_years": 2, "image": url}).json()
     assert v["market_value"] == 320 and v["value_source"] == "depreciation formula"
+
+
+def test_open_room_creates_seats_from_names(monkeypatch):
+    import orchestrator.app as appmod
+
+    e = appmod.Engine(agent_urls=["http://localhost:8001", "http://localhost:8002"], tick_delay=0, phase_pause=0)
+    setups = []
+    monkeypatch.setattr(appmod.RemoteAgent, "setup", lambda self, sc, reset=False: setups.append((self.pid, reset)))
+    e.load("moveout-open")
+    assert e.scenario.participants == []
+    a = e.add_seat("Karthik")
+    b = e.add_seat("Ritvik")
+    assert (a, b) == ("karthik", "ritvik")
+    assert e.add_seat("karthik") == "karthik"                       # same name = rejoin, no new seat
+    assert e.agents["ritvik"].url == "http://localhost:8002"
+    assert all(it.shares == {"karthik": 0.5, "ritvik": 0.5} for it in e.scenario.items)
+    with pytest.raises(RuntimeError, match="full"):
+        e.add_seat("Third")
+    e.phase = "AUCTION"
+    with pytest.raises(RuntimeError, match="already started"):
+        e.add_seat("Late")
+    fixed = appmod.Engine(agent_urls=["http://localhost:8001"], tick_delay=0, phase_pause=0)
+    fixed.load("inheritance")
+    with pytest.raises(RuntimeError, match="fixed seats"):
+        fixed.add_seat("Stranger")

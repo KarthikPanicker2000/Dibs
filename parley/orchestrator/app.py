@@ -27,7 +27,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from agent import llm
 from core.allocation import auction_order, classify_all, compute_credits, spend_caps
 from core.auction import run_clock_auction, start_price
-from core.models import SCENARIO_DIR, Event, Item, Outcome, Scenario, load_scenario
+from core.models import SCENARIO_DIR, Event, Item, Outcome, Participant, Scenario, load_scenario
 
 from . import juror
 from .agents import Agent, LocalAgent, RemoteAgent
@@ -50,6 +50,14 @@ def pmap(fn, xs: list) -> list:
         return list(ex.map(fn, xs))
 
 
+def equal_shares(sc: Scenario) -> Scenario:
+    """Open rooms: everyone who has joined owns an equal share of every item."""
+    if not sc.open_seats or not sc.participants:
+        return sc
+    share = {p.id: 1 / len(sc.participants) for p in sc.participants}
+    return sc.model_copy(update={"items": [it.model_copy(update={"shares": dict(share)}) for it in sc.items]})
+
+
 class Engine:
     def __init__(self, agent_urls: list[str] | None = None, tick_delay: float | None = None,
                  phase_pause: float | None = None):
@@ -62,6 +70,7 @@ class Engine:
         self.countdown_s = 10
         self.phase_pause = float(os.environ.get("PHASE_PAUSE", "1.2")) if phase_pause is None else phase_pause
         self.lock = threading.RLock()
+        self._seat_lock = threading.Lock()
         self.busy = False
         self.scenario: Scenario | None = None
         self.agents: dict[str, Agent] = {}
@@ -111,7 +120,7 @@ class Engine:
     def load(self, scenario_id: str):
         if self.busy:
             raise RuntimeError("busy")
-        sc = load_scenario(scenario_id)
+        sc = equal_shares(load_scenario(scenario_id))
         with self.lock:
             self.scenario = sc
             self._reset_state()
@@ -129,6 +138,38 @@ class Engine:
         self.emit("phase", f"Loaded scenario: {sc.title}")
         for n in sc.notes:
             self.emit("message", n)
+
+    def add_seat(self, name: str) -> str:
+        """Open rooms: someone scanned the QR and typed their name. Same name again = rejoin."""
+        with self._seat_lock:
+            for p in self.scenario.participants:
+                if p.name.lower() == name.lower():
+                    return p.id
+            if not self.scenario.open_seats:
+                raise RuntimeError("This room has fixed seats. Tap your name instead.")
+            if self.phase not in ("SETUP", "APPRAISE", "INTAKE"):
+                raise RuntimeError("This room has already started dividing items, so no new seats.")
+            used = {a.url for a in self.agents.values() if a.url}
+            free = [u for u in self.agent_urls if u not in used]
+            if not free:
+                raise RuntimeError(f"The room is full ({len(self.agent_urls)} phone seats).")
+            base = re.sub(r"[^a-z0-9]+", "", name.lower()) or "guest"
+            pid, n = base, 2
+            while pid in self.agents:
+                pid, n = f"{base}{n}", n + 1
+            agent = RemoteAgent(pid, free[0], orch_url=os.environ.get("ORCH_URL", "http://localhost:8000"))
+            with self.lock:
+                sc = self.scenario.model_copy(update={"participants": self.scenario.participants + [Participant(id=pid, name=name)]})
+                self.scenario = equal_shares(sc)
+                self.agents[pid] = agent
+                self.intake[pid] = False
+                self.joined[pid] = False
+            agent.setup(self.scenario, reset=True)
+            for other, a in self.agents.items():
+                if other != pid:
+                    a.setup(self.scenario)      # ownership shares changed; keeps their ratings
+            self.emit("message", f"🪑 {name} took a seat. {len(self.scenario.participants)} people in the room.")
+            return pid
 
     def push_catalog(self):
         for a in self.agents.values():
@@ -440,6 +481,7 @@ class Engine:
                 "llm": llm.MODE, "llm_label": llm.LABEL, "llm_error": llm.disabled_reason,
                 "scenario": None if sc is None else {
                     "id": sc.id, "title": sc.title, "kind": sc.kind, "will": sc.will, "notes": sc.notes,
+                    "open_seats": sc.open_seats,
                     "topup_pct": sc.topup_pct, "sale_estimates": sc.sale_estimates,
                     "participants": [{"id": p.id, "name": p.name,
                                       "agent_url": getattr(self.agents.get(p.id), "url", None)} for p in sc.participants],
@@ -515,6 +557,25 @@ def join_page():
     return (UI_DIR / "join.html").read_text()
 
 
+@app.post("/join")
+def join_new(request: Request, body: dict = Body(...)):
+    """Open rooms: create (or find) the seat for this name and send the phone to its agent."""
+    name = re.sub(r"\s+", " ", str(body.get("name", ""))).strip()[:30]
+    if not name:
+        raise HTTPException(400, "Type your name first.")
+    try:
+        pid = engine.add_seat(name)
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+    a = engine.agents[pid]
+    if not a.url:
+        raise HTTPException(404, "That seat has no phone agent.")
+    engine.joined[pid] = True
+    engine.emit("message", f"📱 {engine.name(pid)} joined from a phone.")
+    base = public_base(request)
+    return {"url": f"{with_host(a.url, base)}/?room={base}"}
+
+
 @app.get("/join/{pid}")
 def join(pid: str, request: Request):
     a = engine.agents.get(pid)
@@ -549,8 +610,8 @@ def save_room(body: dict = Body(...)):
         sc = Scenario.model_validate(body)
     except Exception as e:
         raise HTTPException(400, f"Invalid room: {e}")
-    if not sc.participants or not sc.items:
-        raise HTTPException(400, "A room needs at least one person and one item.")
+    if not sc.items or (not sc.participants and not sc.open_seats):
+        raise HTTPException(400, "A room needs at least one item, and either people or open seats.")
     (SCENARIO_DIR / f"{sc.id}.json").write_text(json.dumps(sc.model_dump(), indent=2, ensure_ascii=False))
     try:
         engine.load(sc.id)

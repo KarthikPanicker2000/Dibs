@@ -100,6 +100,7 @@ async function loadCatalog() {
   $("hello").textContent = `Hi ${cat.name}`;
   $("room").textContent = cat.title;
   $("maxtop").textContent = cat.max_top_ratings;
+  $("demo").hidden = !cat.has_demo;   // rooms without demo ratings: only Save
   if (await claim()) { buildForm(); tick(); }
 }
 

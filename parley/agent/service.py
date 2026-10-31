@@ -48,7 +48,7 @@ def create_app(logic: AgentLogic) -> FastAPI:
         return {"id": sc.id, "title": sc.title, "you": logic.pid, "name": logic.name,
                 "max_top_ratings": sc.max_top_ratings, "will": sc.will,
                 "items": [i.model_dump() for i in sc.items],
-                "has_prefs": logic.prefs is not None}
+                "has_prefs": logic.prefs is not None, "has_demo": logic.demo_prefs() is not None}
 
     @app.post("/setup")
     def setup(body: dict = Body(...)):

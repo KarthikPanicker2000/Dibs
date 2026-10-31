@@ -49,6 +49,7 @@ class Scenario(BaseModel):
     will: str = ""                # will text, shown on screen
     notes: list[str] = []         # one-liners for the setup screen
     sale_estimates: dict[str, float] = {}   # unwanted item -> expected sale proceeds; missing => donate
+    open_seats: bool = False      # people create their own seat by scanning the QR; everyone owns an equal share
 
 
 # ---- private, lives only inside an agent ----
