@@ -243,6 +243,10 @@ class AgentLogic:
         except (TypeError, ValueError):
             suggestion = mock_drop
         drop = max(0.0, min(suggestion, v, cap))          # 7.5 step 2: code clamps the LLM
+        if info.get("manual") and self.owner_token:
+            # manual bidding: the person decides in real time from their phone; the agent only
+            # enforces the spend cap. Seats nobody claimed keep bidding automatically.
+            drop = cap
         with self.lock:
             self.drops[item_id] = drop
             self.caps_seen[item_id] = cap

@@ -48,3 +48,20 @@ def test_admin_room_roundtrip(tmp_path, monkeypatch):
     assert (tmp_path / "room-lab-move.json").exists()
     assert c.get("/state").json()["scenario"]["title"] == "Lab move"
     assert c.get("/qr.svg", params={"data": "http://x/join"}).text.count("<svg") == 1
+
+
+def test_manual_bidding_leaves_the_drop_to_the_person(agent):
+    agent.claim()
+    agent.demo_fill()
+    agent.auction_start({"item_id": "ring", "market": 9000, "cap": 11250, "remaining": [], "manual": True})
+    assert agent.auction_tick("ring", 11250)["stay"] is True      # stays in until the cap...
+    assert agent.auction_tick("ring", 11700)["stay"] is False
+    agent.override("ring", "drop")                                  # ...or until the person presses Drop out
+    assert agent.auction_tick("ring", 1800)["stay"] is False
+
+
+def test_unclaimed_seat_still_bids_automatically(agent):
+    agent.demo_fill()
+    later = [{"item_id": "piano", "market": 6000, "contestants": ["ana", "ben"]}]
+    agent.auction_start({"item_id": "ring", "market": 9000, "cap": 11250, "remaining": later, "manual": True})
+    assert agent.drops["ring"] < 11250          # agent still saves budget for the piano

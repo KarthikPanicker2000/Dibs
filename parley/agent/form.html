@@ -169,6 +169,7 @@ function renderLive() {
   const a = st && st.auction, el = $("live");
   if (!st || !["NEGOTIATE", "AUCTION"].includes(st.phase) || (st.phase === "AUCTION" && !a)) {
     el.hidden = !(st && st.phase === "NEGOTIATE");
+    if (!el.hidden && !$("liveInfo")) el.innerHTML = "";
     if (!el.hidden) el.innerHTML = `<h2>Negotiation</h2><div>Your agent is negotiating the contested items for you. Messages stay sealed until the reveal.</div>`;
     return;
   }
@@ -178,30 +179,37 @@ function renderLive() {
   const mine = a.contestants.includes(cat.you);
   const out = a.dropped[cat.you] != null, won = a.winner === cat.you;
   const drop = me && me.drops[a.item_id], cap = st.remaining[cat.you], cap0 = st.caps[cat.you];
-  let you = "";
+  const manual = !!st.human_bidding;
+  let status = "", controls = "";
   if (mine) {
-    const status = won ? `<div class="ok center"><b>🏆 You won it at ${money(a.price)}</b></div>`
+    status = won ? `<div class="ok center"><b>🏆 You won it at ${money(a.price)}</b></div>`
       : a.winner ? `<div class="center meta">${esc(nameOf(a.winner))} won it at ${money(a.price)}</div>`
       : out ? `<div class="bad center"><b>You're out</b> (dropped at ${money(a.dropped[cat.you])})</div>`
+      : manual ? `<div class="center">You're <b class="ok">IN</b> at ${money(a.price)}. Press <b>Drop out</b> when it's too much for you.</div>`
       : `<div class="center">You're <b class="ok">still in</b>${drop != null ? ` · your agent stays in up to <b>${drop < 0 ? "—" : money(drop)}</b>` : ""}</div>`;
-    const controls = !a.winner && !out && drop != null ? `
+    controls = !a.winner && !out && drop != null ? (manual ? `
+      <div class="row"><button class="danger" style="font-size:22px;padding:20px" onclick="override('${a.item_id}','drop')">✋ Drop out</button></div>
+      <details style="margin-top:8px"><summary>Auto-drop at a price (optional)</summary>
+        <div class="row"><input type="number" id="upto" placeholder="Drop me automatically above $" step="50" min="0" value="${drop > 0 && drop < me.caps[a.item_id] ? Math.round(drop) : ""}"></div>
+        <div class="row"><button class="primary" onclick="override('${a.item_id}','stay')">Set auto-drop</button></div></details>
+      <div class="meta">You'll be dropped automatically at your spend cap of ${money(me.caps[a.item_id])}.</div>` : `
       <div class="row"><input type="number" id="upto" placeholder="Stay in up to $" step="50" min="0" value="${drop > 0 ? Math.round(drop) : ""}"></div>
       <div class="row"><button class="primary" onclick="override('${a.item_id}','stay')">Set my limit</button>
         <button class="danger" onclick="override('${a.item_id}','drop')">Drop out now</button></div>
-      <div class="meta">Your limit can't go above your spend cap of ${money(me.caps[a.item_id])}.</div>` : "";
-    you = status + controls + `<div id="bidmsg" class="center">${bidMsg}</div>`;
+      <div class="meta">Your limit can't go above your spend cap of ${money(me.caps[a.item_id])}.</div>`) : "";
   } else {
-    you = `<div class="center meta">You're watching: ${a.contestants.map(nameOf).map(esc).join(" vs ")}</div>`;
+    status = `<div class="center meta">You're watching: ${a.contestants.map(nameOf).map(esc).join(" vs ")}</div>`;
   }
-  const head = a.status === "countdown" ? `<div class="center warn"><b>Bidding opens in ${a.countdown}s</b>. Set your limit now.</div>`
+  const head = a.status === "countdown" ? `<div class="center warn"><b>Bidding opens in ${a.countdown}s</b>. ${manual ? "Get ready." : "Set your limit now."}</div>`
              : `<div class="center meta">${a.status === "done" ? "SOLD" : "Clock rising"}</div>`;
-  const typing = document.activeElement && document.activeElement.id === "upto" ? $("upto").value : null;
   if (el.dataset.item !== a.item_id) { el.dataset.item = a.item_id; bidMsg = ""; }
-  el.innerHTML = `<h2>Bidding war</h2>${head}
-    <div class="center name">${it.emoji || ""} ${esc(it.name)} · market ${money(a.market)}</div>
-    <div class="price">${money(a.price)}</div>${you}
-    ${cap0 != null ? `<div class="meta">Your spend cap: ${money(Math.max(0, cap))} left of ${money(cap0)}</div><div class="bar"><i style="width:${Math.max(0, 100 * cap / cap0)}%"></i></div>` : ""}`;
-  if (typing !== null && $("upto")) { $("upto").value = typing; $("upto").focus(); }   // keep what you're typing
+  if (!$("liveInfo")) el.innerHTML = `<h2>Bidding war</h2><div id="liveInfo"></div><div id="liveCtl"></div><div id="bidmsg" class="center"></div><div id="liveCap"></div>`;
+  $("liveInfo").innerHTML = `${head}<div class="center name">${it.emoji || ""} ${esc(it.name)} · market ${money(a.market)}</div>
+    <div class="price">${money(a.price)}</div>${status}`;
+  // buttons are only rebuilt when they change, so a tap never lands on a button being replaced
+  if ($("liveCtl").dataset.html !== controls) { $("liveCtl").dataset.html = controls; $("liveCtl").innerHTML = controls; }
+  $("bidmsg").innerHTML = bidMsg;
+  $("liveCap").innerHTML = cap0 != null ? `<div class="meta">Your spend cap: ${money(Math.max(0, cap))} left of ${money(cap0)}</div><div class="bar"><i style="width:${Math.max(0, 100 * cap / cap0)}%"></i></div>` : "";
 }
 
 function renderResults() {

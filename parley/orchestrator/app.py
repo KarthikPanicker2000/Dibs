@@ -344,7 +344,7 @@ class Engine:
             starts = pmap(lambda p: self.agents[p].auction_start({
                 "item_id": item_id, "market": it.market_value, "cap": round(self.remaining.get(p, 0.0), 2),
                 "credits": round(credits.get(p, 0.0), 2), "rivals": [self.name(q) for q in people if q != p],
-                "remaining": later}), people)
+                "remaining": later, "manual": self.human_bidding}), people)
             for p, res in zip(people, starts):
                 self._filtered(p, res)
                 if res.get("comment"):
@@ -563,7 +563,7 @@ def save_room(body: dict = Body(...)):
 def settings(body: dict = Body(...)):
     if "human_bidding" in body:
         engine.human_bidding = bool(body["human_bidding"])
-        engine.tick_delay = 1.0 if engine.human_bidding else engine.fast_tick
+        engine.tick_delay = 1.5 if engine.human_bidding else engine.fast_tick
     return {"human_bidding": engine.human_bidding, "tick_delay": engine.tick_delay}
 
 
