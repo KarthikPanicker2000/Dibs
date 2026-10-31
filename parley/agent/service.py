@@ -19,7 +19,7 @@ FORM = Path(__file__).resolve().parent / "form.html"
 
 
 def create_app(logic: AgentLogic) -> FastAPI:
-    app = FastAPI(title=f"Parley agent {logic.pid or ''}")
+    app = FastAPI(title=f"Dibs agent {logic.pid or ''}")
 
     @app.get("/", response_class=HTMLResponse)
     def form():
@@ -37,7 +37,7 @@ def create_app(logic: AgentLogic) -> FastAPI:
     def chat(body: dict = Body(default={})):
         # Maritime's container contract wants POST /chat; it only ever returns public status.
         st = logic.status()
-        return {"response": f"I'm {st['name']}'s private Parley agent. My numbers stay with me until the verdict is final.",
+        return {"response": f"I'm {st['name']}'s private Dibs agent. My numbers stay with me until the verdict is final.",
                 "status": st}
 
     @app.get("/catalog")

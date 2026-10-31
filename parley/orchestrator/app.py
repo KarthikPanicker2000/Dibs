@@ -64,8 +64,9 @@ class Engine:
         if agent_urls is None:
             agent_urls = [u.strip() for u in os.environ.get("AGENT_URLS", "").split(",") if u.strip()]
         self.agent_urls = agent_urls
-        self.tick_delay = float(os.environ.get("TICK_DELAY", "0.25")) if tick_delay is None else tick_delay
-        self.fast_tick = self.tick_delay
+        # seconds between price steps: automatic bidding vs people bidding live from their phones
+        self.tick_auto = float(os.environ.get("TICK_DELAY", "2")) if tick_delay is None else tick_delay
+        self.tick_manual = float(os.environ.get("MANUAL_TICK_DELAY", "3.5")) if tick_delay is None else tick_delay
         self.human_bidding = False      # admin toggle: slow clock + countdown so people can bid from phones
         self.countdown_s = 10
         self.phase_pause = float(os.environ.get("PHASE_PAUSE", "1.2")) if phase_pause is None else phase_pause
@@ -76,6 +77,10 @@ class Engine:
         self.agents: dict[str, Agent] = {}
         self._local_cache: dict[str, LocalAgent] = {}
         self._reset_state()
+
+    @property
+    def tick_delay(self) -> float:
+        return self.tick_manual if self.human_bidding else self.tick_auto
 
     # ---- state -------------------------------------------------------------
     def _reset_state(self):
@@ -488,6 +493,7 @@ class Engine:
                 },
                 "items": [i.model_dump() for i in sc.items] if sc else [],
                 "intake": self.intake, "joined": getattr(self, "joined", {}), "human_bidding": self.human_bidding,
+                "tick_seconds": self.tick_delay,
                 "slots": len(self.agent_urls),
                 "interest": self.interest, "classes": self.classes,
                 "contestants": self.contestants, "outcomes": [o.model_dump() for o in self.outcomes],
@@ -503,7 +509,7 @@ class Engine:
 
 
 engine = Engine()
-app = FastAPI(title="Parley orchestrator")
+app = FastAPI(title="Dibs orchestrator")
 # phones load their page from their own agent and read the public room state from here
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
 UI_DIR = UI.parent
@@ -663,7 +669,12 @@ def appraise_item(body: dict = Body(...)):
 def settings(body: dict = Body(...)):
     if "human_bidding" in body:
         engine.human_bidding = bool(body["human_bidding"])
-        engine.tick_delay = 1.5 if engine.human_bidding else engine.fast_tick
+    if "tick_seconds" in body:   # for whichever mode is on
+        secs = max(0.2, min(15.0, float(body["tick_seconds"])))
+        if engine.human_bidding:
+            engine.tick_manual = secs
+        else:
+            engine.tick_auto = secs
     return {"human_bidding": engine.human_bidding, "tick_delay": engine.tick_delay}
 
 

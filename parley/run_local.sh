@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Parley local run: orchestrator on :8000, one agent process per participant on :8001-8003.
+# Dibs local run: orchestrator on :8000, one agent process per participant on :8001-8003.
 # Usage: ./run_local.sh [scenario]      (default: inheritance; LLM_MODE=mock unless .env has Gemma set)
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -32,7 +32,7 @@ $PY -m uvicorn orchestrator.app:app --host "$HOST" --port 8000 --log-level warni
 pids+=($!)
 sleep 1.5
 echo
-echo "  Parley is up:  big screen  http://localhost:8000"
+echo "  Dibs is up:  big screen  http://localhost:8000"
 echo "                 agents      ${AGENT_URLS//,/  }  (phones: use this laptop's IP for localhost ones)"
 echo "  LLM mode: $($PY -c 'from agent import llm; print(llm.MODE)')   scenario: $SCENARIO   (Ctrl-C to stop)"
 wait

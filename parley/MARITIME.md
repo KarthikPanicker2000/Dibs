@@ -1,4 +1,4 @@
-# Putting Parley agents on Maritime (one micro-VM per participant)
+# Putting Dibs agents on Maritime (one micro-VM per participant)
 
 Maritime builds from a GitHub repo with a Dockerfile at its root. `parley/Dockerfile` runs one
 agent (`agent.service:app`) on `$PORT`, keeps its state in `/data`, and answers `GET /health` and

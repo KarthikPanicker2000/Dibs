@@ -1,4 +1,4 @@
-# One Parley agent per container (Maritime agent box). Set PARTICIPANT_ID per deployment.
+# One Dibs agent per container (Maritime agent box). Set PARTICIPANT_ID per deployment.
 FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .

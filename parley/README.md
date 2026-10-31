@@ -1,4 +1,4 @@
-# Parley
+# Dibs
 
 Each person gets a private AI agent that holds their secret preferences. The agents negotiate and bid
 for co-owned items, a juror checks that the result is fair, and nobody reveals their numbers until the
@@ -35,7 +35,8 @@ Scenarios (dropdown → Load):
   price, your limit, **Set my limit**, **Drop out now**) and your result (fairness check with your own numbers,
   what you get and pay, and which of your wants were met). The phone only talks to its own agent; the agent relays the
   public room state.
-- **Human bidding** (admin toggle) adds a 10 s countdown before each item and slows the clock to 1 s per tick.
+- **Manual bidding** (admin toggle): people press Drop out on their phones; a 10 s countdown before each item.
+- **Clock speed:** 2 s between price steps normally, 3.5 s with manual bidding. Change it live on the admin page.
 - `run_local.sh` starts 6 phone seats (`AGENT_SLOTS` to change).
 
 ## LLM backends
@@ -67,7 +68,7 @@ and every outgoing line passes through the leak filter.
 
 ## Knobs
 
-`TICK_DELAY` (default 0.25 s per auction tick), `PHASE_PAUSE` (1.2 s between phases), `NEGOTIATE=0` (skip
+`TICK_DELAY` (default 2 s per price step), `MANUAL_TICK_DELAY` (3.5 s), `PHASE_PAUSE` (1.2 s between phases), `NEGOTIATE=0` (skip
 negotiation), `AGENT1_URL`, `AGENT2_URL`, `AGENT3_URL` (use a remote agent for that slot, e.g. on Maritime; see MARITIME.md).
 
 ## Layout

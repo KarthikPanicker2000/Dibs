@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Parley Admin</title>
+<title>Dibs Admin</title>
 <style>
   :root { --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --line: #2a3342; --text: #e6edf3; --muted: #8b98a9; --accent: #7c9cff; --green: #3fb950; --red: #f85149; --gold: #f2c14e; }
   * { box-sizing: border-box; }
@@ -37,7 +37,7 @@
 </head>
 <body>
 <header>
-  <div class="logo">Par<span>ley</span> admin</div>
+  <div class="logo">Dib<span>s</span> admin</div>
   <span class="phase" id="phase">…</span>
   <span class="meta" id="room"></span>
   <div style="flex:1"></div>
@@ -55,7 +55,9 @@
       <h2>Run the room</h2>
       <div class="row"><button id="next">Next phase ▸</button><button id="run" class="primary">Run all ▸▸</button></div>
       <div class="row" style="margin-top:8px"><button id="reset">Reset room</button></div>
-      <label><input type="checkbox" id="human" style="width:auto"> <b>Manual bidding</b>: people bid live from their phones and press <i>Drop out</i> when the price is too high (10 s countdown per item, 1.5 s per price step). Seats nobody joined still bid automatically.</label>
+      <label><input type="checkbox" id="human" style="width:auto"> <b>Manual bidding</b>: people bid live from their phones and press <i>Drop out</i> when the price is too high (10 s countdown per item). Seats nobody joined still bid automatically.</label>
+      <label>Seconds between price steps (for the mode that's on)</label>
+      <div class="row"><input id="tick" type="number" min="0.2" max="15" step="0.5"><button id="tickSet">Set</button></div>
       <div id="err"></div>
       <table id="people" style="margin-top:8px"></table>
     </div>
@@ -229,6 +231,7 @@ $("next").onclick = () => api("POST", "/next");
 $("run").onclick = () => api("POST", "/run");
 $("reset").onclick = () => S && S.scenario && api("POST", "/scenario/" + S.scenario.id);
 $("human").onchange = () => api("POST", "/admin/settings", {human_bidding: $("human").checked});
+$("tickSet").onclick = () => api("POST", "/admin/settings", {tick_seconds: Number($("tick").value)});
 
 async function refreshTemplates(select) {
   const list = await api("GET", "/scenarios");
@@ -242,6 +245,7 @@ async function poll() {
     $("room").textContent = S.scenario ? S.scenario.title : "";
     $("next").disabled = $("run").disabled = S.busy || S.phase === "REVEAL";
     $("human").checked = S.human_bidding;
+    if (document.activeElement !== $("tick")) $("tick").value = S.tick_seconds;
     if (S.scenario) {
       $("people").innerHTML = `<tr><th>Person</th><th>Phone</th><th>Ratings</th><th>Fair?</th></tr>` + S.scenario.participants.map(p => `<tr>
         <td><b>${esc(p.name)}</b></td><td>${p.agent_url ? (S.joined[p.id] ? '<span class="ok">joined</span>' : "not yet") : '<span class="bad">no seat</span>'}</td>
