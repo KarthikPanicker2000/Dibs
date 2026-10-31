@@ -70,8 +70,9 @@ class LocalAgent(Agent):
 
 
 class RemoteAgent(Agent):
-    def __init__(self, pid: str, url: str, timeout: float = 60.0):
+    def __init__(self, pid: str, url: str, timeout: float = 60.0, orch_url: str | None = None):
         self.pid = pid
+        self.orch_url = orch_url      # lets the agent relay public room state to its phone
         self.url = url.rstrip("/")
         self.http = httpx.Client(base_url=self.url, timeout=timeout)
 
@@ -86,7 +87,8 @@ class RemoteAgent(Agent):
         return r.json()
 
     def setup(self, scenario, reset=False):
-        return self._post("/setup", {"scenario": scenario.model_dump(), "participant_id": self.pid, "reset": reset})
+        return self._post("/setup", {"scenario": scenario.model_dump(), "participant_id": self.pid, "reset": reset,
+                                     "orch_url": self.orch_url})
 
     def status(self):
         return self._get("/status")

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join Parley</title>
+<style>
+  body { margin: 0 auto; max-width: 520px; padding: 20px 16px; background: #0d1117; color: #e6edf3; font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  h1 { font-size: 24px; margin: 4px 0 6px; } .meta { color: #8b98a9; font-size: 14px; }
+  a.seat { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; padding: 16px; border-radius: 12px; background: #161b22; border: 1px solid #2a3342; color: #e6edf3; text-decoration: none; font-size: 20px; font-weight: 700; }
+  a.seat span { font-size: 13px; font-weight: 600; color: #8b98a9; }
+  .will { background: #1f2a3d; border-radius: 10px; padding: 10px 12px; margin: 12px 0; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="meta">Parley · join the room</div>
+<h1 id="title">Loading…</h1>
+<div id="will"></div>
+<p class="meta">Who are you? Tap your name. Your phone then talks only to your own private agent.</p>
+<div id="seats"></div>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+async function load() {
+  const s = await (await fetch("/state")).json();
+  if (!s.scenario) { setTimeout(load, 2000); return; }
+  document.getElementById("title").textContent = s.scenario.title;
+  document.getElementById("will").innerHTML = s.scenario.will ? `<div class="will">${esc(s.scenario.will)}</div>` : "";
+  document.getElementById("seats").innerHTML = s.scenario.participants.map(p =>
+    `<a class="seat" href="/join/${encodeURIComponent(p.id)}">${esc(p.name)}<span>${p.agent_url ? (s.joined[p.id] ? "joined · tap to rejoin" : "open seat") : "no phone agent"}</span></a>`).join("");
+}
+load();
+</script>
+</body>
+</html>

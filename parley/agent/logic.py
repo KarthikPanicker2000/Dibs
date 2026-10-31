@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import threading
 from pathlib import Path
 
@@ -30,6 +31,10 @@ class AgentLogic:
         self.blocked_drafts: list[str] = []     # leak-filtered drafts, shown only at reveal
         self.attest_detail: dict = {}
         self.unlocked = False
+        self.owner_token: str | None = None     # set when a phone claims this seat
+        self.locked = False                     # ratings lock once interest is published
+        self.caps_seen: dict[str, float] = {}   # spend cap the orchestrator gave us per auctioned item
+        self.orch_url: str | None = None
         self.lock = threading.RLock()
         self._restore()
 
@@ -43,7 +48,9 @@ class AgentLogic:
             self.scenario, self.pid = sc, pid
             if reset or not same:
                 self.prefs, self.drops, self.blocked_drafts, self.attest_detail = None, {}, [], {}
-                self.unlocked = False
+                self.unlocked, self.locked, self.caps_seen = False, False, {}
+                if reset:
+                    self.owner_token = None
                 if reset:
                     self._saved_path().unlink(missing_ok=True)
                 else:
@@ -63,7 +70,40 @@ class AgentLogic:
     def items(self) -> dict[str, Item]:
         return {i.id: i for i in self.scenario.items} if self.scenario else {}
 
+    def claim(self, token: str | None = None) -> dict:
+        """The first phone to open this seat gets a token; other devices are refused."""
+        with self.lock:
+            if self.owner_token and token != self.owner_token:
+                raise PermissionError("This seat is already taken on another device. Ask the admin to reset the room.")
+            if not self.owner_token:
+                self.owner_token = secrets.token_urlsafe(16)
+                self._persist()
+        return {"token": self.owner_token, "name": self.name}
+
+    def check_owner(self, token: str | None) -> None:
+        if self.owner_token and token != self.owner_token:
+            raise PermissionError("Only the phone that claimed this seat can see or change it.")
+
+    def me(self) -> dict:
+        """Private view for the seat owner's own phone."""
+        return {"participant": self.pid, "name": self.name, "prefs": self.prefs.model_dump() if self.prefs else None,
+                "values": {k: round(v, 2) for k, v in self.values().items()},
+                "drops": {k: round(v, 2) for k, v in self.drops.items()}, "caps": self.caps_seen,
+                "fairness": self.attest_detail, "locked": self.locked}
+
+    def override(self, item_id: str, action: str, amount: float | None = None) -> dict:
+        """Human bidding: drop out now, or stay in up to an amount (clamped to the spend cap)."""
+        with self.lock:
+            if item_id not in self.drops:
+                raise ValueError("Bidding on that item hasn't opened for you.")
+            cap = self.caps_seen.get(item_id, 0.0)
+            self.drops[item_id] = -1.0 if action == "drop" else max(0.0, min(float(amount or 0), cap))
+            self._persist()
+            return {"drop": round(self.drops[item_id], 2), "cap": cap}
+
     def set_prefs(self, prefs: dict | PrivatePrefs) -> dict:
+        if self.locked:
+            raise ValueError("Ratings are locked: interest was already published.")
         p = PrivatePrefs.model_validate(prefs if isinstance(prefs, dict) else prefs.model_dump())
         items = self.items
         ratings = {i: max(0, min(10, int(p.ratings.get(i, 0)))) for i in items}
@@ -87,14 +127,15 @@ class AgentLogic:
 
     def demo_fill(self) -> dict:
         d = self.demo_prefs()
-        if d is None:
-            raise ValueError("no demo_prefs for this participant")
-        return self.set_prefs(d)
+        if d is None:   # custom room, no demo ratings: an empty intake means "wants nothing"
+            return {**self.set_prefs(PrivatePrefs(ratings={})), "demo": False}
+        return {**self.set_prefs(d), "demo": True}
 
     def status(self) -> dict:
         return {"participant": self.pid, "name": self.name,
                 "scenario": self.scenario.id if self.scenario else None,
-                "has_prefs": self.prefs is not None, "unlocked": self.unlocked, "llm": llm.MODE}
+                "has_prefs": self.prefs is not None, "unlocked": self.unlocked, "llm": llm.MODE,
+                "claimed": self.owner_token is not None}
 
     def _saved_path(self) -> Path:
         sid = self.scenario.id if self.scenario else "none"
@@ -114,7 +155,8 @@ class AgentLogic:
             self._state_path().write_text(json.dumps({
                 "pid": self.pid, "scenario": self.scenario.model_dump() if self.scenario else None,
                 "prefs": self.prefs.model_dump() if self.prefs else None, "drops": self.drops,
-                "blocked_drafts": self.blocked_drafts, "attest_detail": self.attest_detail, "unlocked": self.unlocked}))
+                "blocked_drafts": self.blocked_drafts, "attest_detail": self.attest_detail, "unlocked": self.unlocked,
+                "owner_token": self.owner_token, "locked": self.locked, "caps_seen": self.caps_seen}))
         except OSError:
             pass
 
@@ -132,6 +174,9 @@ class AgentLogic:
         self.blocked_drafts = d.get("blocked_drafts", [])
         self.attest_detail = d.get("attest_detail", {})
         self.unlocked = bool(d.get("unlocked"))
+        self.owner_token = d.get("owner_token")
+        self.locked = bool(d.get("locked"))
+        self.caps_seen = d.get("caps_seen", {})
 
     def _load_saved(self) -> None:
         path = self._saved_path()
@@ -161,6 +206,9 @@ class AgentLogic:
     def interest(self) -> dict[str, str]:
         """7.2: only the coarse bucket leaves the agent."""
         thr = self.scenario.contest_threshold if self.scenario else 7
+        if not self.locked:
+            self.locked = True
+            self._persist()
         return {i: interest_bucket(self.rating(i), thr) for i in self.items}
 
     def auction_start(self, info: dict) -> dict:
@@ -197,6 +245,7 @@ class AgentLogic:
         drop = max(0.0, min(suggestion, v, cap))          # 7.5 step 2: code clamps the LLM
         with self.lock:
             self.drops[item_id] = drop
+            self.caps_seen[item_id] = cap
 
         def drafts(attempt: int) -> str:
             if attempt == 0:

@@ -9,7 +9,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException
+import httpx
+from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 
 from .logic import AgentLogic
@@ -51,18 +52,58 @@ def create_app(logic: AgentLogic) -> FastAPI:
 
     @app.post("/setup")
     def setup(body: dict = Body(...)):
+        if body.get("orch_url"):
+            logic.orch_url = body["orch_url"]
         return logic.setup(body["scenario"], body.get("participant_id"), bool(body.get("reset")))
 
+    @app.get("/room_state")
+    def room_state():
+        # public room state relayed for this agent's phone, so the phone only ever talks to its own agent
+        if not logic.orch_url:
+            raise HTTPException(503, "not connected to a room yet")
+        try:
+            return httpx.get(f"{logic.orch_url}/state", timeout=5).json()
+        except httpx.HTTPError as e:
+            raise HTTPException(502, f"room unreachable: {e}")
+
+    def owner(token):
+        try:
+            logic.check_owner(token)
+        except PermissionError as e:
+            raise HTTPException(403, str(e))
+
+    @app.post("/claim")
+    def claim(body: dict = Body(default={})):
+        try:
+            return logic.claim(body.get("token"))
+        except PermissionError as e:
+            raise HTTPException(403, str(e))
+
+    @app.get("/me")
+    def me(x_owner_token: str | None = Header(default=None)):
+        owner(x_owner_token)
+        return logic.me()
+
+    @app.post("/auction/override")
+    def override(body: dict = Body(...), x_owner_token: str | None = Header(default=None)):
+        owner(x_owner_token)
+        try:
+            return logic.override(body["item_id"], body.get("action", "drop"), body.get("amount"))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
     @app.post("/prefs")
-    def prefs(body: dict = Body(...)):
+    def prefs(body: dict = Body(...), x_owner_token: str | None = Header(default=None)):
+        owner(x_owner_token)
         try:
             return logic.set_prefs(body)
         except ValueError as e:
             raise HTTPException(400, str(e))
 
     @app.get("/demo_prefs")
-    def demo_prefs():
+    def demo_prefs(x_owner_token: str | None = Header(default=None)):
         # For the form's auto-fill button: the participant's own demo ratings.
+        owner(x_owner_token)
         d = logic.demo_prefs()
         if d is None:
             raise HTTPException(404, "no demo ratings")

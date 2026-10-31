@@ -15,8 +15,14 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+import json
+import re
+import socket
+from urllib.parse import urlsplit, urlunsplit
+
+from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from agent import llm
 from core.allocation import auction_order, classify_all, compute_credits, spend_caps
@@ -51,6 +57,9 @@ class Engine:
             agent_urls = [u.strip() for u in os.environ.get("AGENT_URLS", "").split(",") if u.strip()]
         self.agent_urls = agent_urls
         self.tick_delay = float(os.environ.get("TICK_DELAY", "0.25")) if tick_delay is None else tick_delay
+        self.fast_tick = self.tick_delay
+        self.human_bidding = False      # admin toggle: slow clock + countdown so people can bid from phones
+        self.countdown_s = 10
         self.phase_pause = float(os.environ.get("PHASE_PAUSE", "1.2")) if phase_pause is None else phase_pause
         self.lock = threading.RLock()
         self.busy = False
@@ -110,12 +119,13 @@ class Engine:
             for i, p in enumerate(sc.participants):
                 url = self.agent_urls[i] if i < len(self.agent_urls) else p.agent_url
                 if url:
-                    self.agents[p.id] = RemoteAgent(p.id, url)
+                    self.agents[p.id] = RemoteAgent(p.id, url, orch_url=os.environ.get("ORCH_URL", "http://localhost:8000"))
                 else:
                     self.agents[p.id] = self._local_cache.setdefault(f"{sc.id}:{p.id}", LocalAgent(p.id))
         for a in self.agents.values():
             a.setup(sc, reset=True)
         self.intake = {pid: False for pid in self.agents}
+        self.joined = {pid: False for pid in self.agents}
         self.emit("phase", f"Loaded scenario: {sc.title}")
         for n in sc.notes:
             self.emit("message", n)
@@ -200,9 +210,10 @@ class Engine:
         self.refresh_intake(force=True)
         for pid, a in self.agents.items():
             if not self.intake.get(pid):
-                a.demo_fill()
+                res = a.demo_fill()
                 self.intake[pid] = True
-                self.emit("message", f"{self.name(pid)}'s agent had no intake yet, so it loaded the demo ratings.")
+                self.emit("message", f"{self.name(pid)}'s agent had no intake yet, so it loaded the demo ratings."
+                          if res.get("demo", True) else f"{self.name(pid)} didn't submit ratings, so their agent wants nothing.")
         for pid, a in self.agents.items():
             buckets = a.interest()
             with self.lock:
@@ -338,6 +349,11 @@ class Engine:
                 self._filtered(p, res)
                 if res.get("comment"):
                     self.emit("message", res["comment"], p)
+            if self.human_bidding:
+                for left in range(self.countdown_s, 0, -1):
+                    with self.lock:
+                        self.auction.update({"status": "countdown", "countdown": left})
+                    time.sleep(1)
             with self.lock:
                 self.auction["status"] = "running"
 
@@ -429,7 +445,9 @@ class Engine:
                                       "agent_url": getattr(self.agents.get(p.id), "url", None)} for p in sc.participants],
                 },
                 "items": [i.model_dump() for i in sc.items] if sc else [],
-                "intake": self.intake, "interest": self.interest, "classes": self.classes,
+                "intake": self.intake, "joined": getattr(self, "joined", {}), "human_bidding": self.human_bidding,
+                "slots": len(self.agent_urls),
+                "interest": self.interest, "classes": self.classes,
                 "contestants": self.contestants, "outcomes": [o.model_dump() for o in self.outcomes],
                 "credits": self.credits, "caps": self.caps, "remaining": self.remaining,
                 "auction": self.auction, "auction_results": self.auction_results,
@@ -444,6 +462,109 @@ class Engine:
 
 engine = Engine()
 app = FastAPI(title="Parley orchestrator")
+# phones load their page from their own agent and read the public room state from here
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
+UI_DIR = UI.parent
+
+
+def lan_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+
+
+def public_base(request: Request) -> str:
+    """Address phones can reach: PUBLIC_URL, else this Mac's Wi-Fi IP instead of localhost."""
+    if os.environ.get("PUBLIC_URL"):
+        return os.environ["PUBLIC_URL"].rstrip("/")
+    host = request.url.hostname or "localhost"
+    if host in ("localhost", "127.0.0.1", "::1"):
+        host = lan_ip()
+    return f"{request.url.scheme}://{host}:{request.url.port or 8000}"
+
+
+def with_host(url: str, base: str) -> str:
+    """Point a localhost agent URL at the host the phone used to reach us."""
+    u, b = urlsplit(url), urlsplit(base)
+    if u.hostname in ("localhost", "127.0.0.1"):
+        u = u._replace(netloc=f"{b.hostname}:{u.port}")
+    return urlunsplit(u)
+
+
+@app.get("/qr.svg")
+def qr(data: str):
+    import io
+
+    import segno
+    buf = io.BytesIO()
+    segno.make(data, error="m").save(buf, kind="svg", scale=8, dark="#0d1117", light="#ffffff", border=2)
+    return Response(buf.getvalue(), media_type="image/svg+xml")
+
+
+@app.get("/room")
+def room(request: Request):
+    base = public_base(request)
+    return {"join_url": f"{base}/join", "big_screen": f"{base}/", "admin": f"{base}/admin"}
+
+
+@app.get("/join", response_class=HTMLResponse)
+def join_page():
+    return (UI_DIR / "join.html").read_text()
+
+
+@app.get("/join/{pid}")
+def join(pid: str, request: Request):
+    a = engine.agents.get(pid)
+    if not a or not a.url:
+        raise HTTPException(404, "That seat has no phone agent (start more agent slots in run_local.sh).")
+    engine.joined[pid] = True
+    engine.emit("message", f"📱 {engine.name(pid)} joined from a phone.")
+    base = public_base(request)
+    return RedirectResponse(f"{with_host(a.url, base)}/?room={base}")
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_page():
+    return (UI_DIR / "admin.html").read_text()
+
+
+@app.get("/scenario_raw/{scenario_id}")
+def scenario_raw(scenario_id: str):
+    """Public part of a scenario for the admin editor (never the demo ratings)."""
+    try:
+        return load_scenario(scenario_id).model_dump()
+    except FileNotFoundError:
+        raise HTTPException(404, "no such scenario")
+
+
+@app.post("/admin/room")
+def save_room(body: dict = Body(...)):
+    """Create or update a custom room from the admin editor, then load it."""
+    slug = re.sub(r"[^a-z0-9]+", "-", str(body.get("title", "room")).lower()).strip("-")[:40] or "room"
+    body["id"] = body.get("id") if str(body.get("id", "")).startswith("room-") else f"room-{slug}"
+    try:
+        sc = Scenario.model_validate(body)
+    except Exception as e:
+        raise HTTPException(400, f"Invalid room: {e}")
+    if not sc.participants or not sc.items:
+        raise HTTPException(400, "A room needs at least one person and one item.")
+    (SCENARIO_DIR / f"{sc.id}.json").write_text(json.dumps(sc.model_dump(), indent=2, ensure_ascii=False))
+    try:
+        engine.load(sc.id)
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True, "id": sc.id}
+
+
+@app.post("/admin/settings")
+def settings(body: dict = Body(...)):
+    if "human_bidding" in body:
+        engine.human_bidding = bool(body["human_bidding"])
+        engine.tick_delay = 1.0 if engine.human_bidding else engine.fast_tick
+    return {"human_bidding": engine.human_bidding, "tick_delay": engine.tick_delay}
 
 
 @app.on_event("startup")

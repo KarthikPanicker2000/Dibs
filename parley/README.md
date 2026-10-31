@@ -23,6 +23,21 @@ Scenarios (dropdown → Load):
 - `roommates`: unequal ownership. The agents agree on a deal in round 1, so there's no auction.
 - `inheritance-edge`: for Q&A. Ben's spending cap runs out below his true value for the piano, and the juror shows ⚠️.
 
+## Rooms and phones
+
+- **Admin:** http://localhost:8000/admin has a join QR, the run controls (Next phase, Run all, Reset, human-bidding
+  toggle), seat status, and a room editor for title, instructions, people, items, values, ownership %, will locks
+  and sale prices. **Save & open room** writes `scenarios/room-<title>.json` and opens it.
+- **Join:** phones scan the QR (on the admin page, or on the big screen during setup and intake), tap their name, and land on their
+  own agent's page. The first phone claims the seat with a token; other devices can't read or change it.
+  Phones must be on the same Wi-Fi as the laptop. Use a phone hotspot if the venue Wi-Fi isolates devices.
+- **Phone page:** instructions, your ratings (locked once interest is published), live bidding (countdown,
+  price, your limit, **Set my limit**, **Drop out now**) and your result (fairness check with your own numbers,
+  what you get and pay, and which of your wants were met). The phone only talks to its own agent; the agent relays the
+  public room state.
+- **Human bidding** (admin toggle) adds a 10 s countdown before each item and slows the clock to 1 s per tick.
+- `run_local.sh` starts 6 phone seats (`AGENT_SLOTS` to change).
+
 ## LLM backends
 
 `LLM_MODE` in `.env` picks the backend. Check it with `.venv/bin/python check_llm.py`, then restart

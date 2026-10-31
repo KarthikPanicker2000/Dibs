@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parley Admin</title>
+<style>
+  :root { --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --line: #2a3342; --text: #e6edf3; --muted: #8b98a9; --accent: #7c9cff; --green: #3fb950; --red: #f85149; --gold: #f2c14e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { display: flex; gap: 14px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .logo { font-weight: 800; font-size: 20px; } .logo span { color: var(--accent); }
+  a { color: var(--accent); }
+  main { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 16px 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+  h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .meta { color: var(--muted); font-size: 12px; }
+  button, select, input, textarea { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; }
+  button { cursor: pointer; font-weight: 600; } button.primary { background: var(--accent); color: #0b1020; border: none; }
+  button:disabled { opacity: .45; }
+  input, textarea, select { width: 100%; } textarea { min-height: 60px; }
+  label { display: block; margin: 8px 0 3px; color: var(--muted); font-size: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .row > * { flex: 1; }
+  .qr { background: #fff; border-radius: 10px; padding: 6px; width: 100%; max-width: 300px; display: block; margin: 0 auto; }
+  table { width: 100%; border-collapse: collapse; } td, th { padding: 4px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; } td input, td select { padding: 5px 6px; }
+  #itemsTbl input[data-k=name] { min-width: 160px; } #itemsTbl input[type=number] { min-width: 76px; }
+  #itemsTbl select { min-width: 110px; } #itemsTbl input[data-k=emoji] { min-width: 44px; }
+  .ok { color: var(--green); } .bad { color: var(--red); }
+  .phase { display: inline-block; padding: 3px 9px; border-radius: 999px; background: var(--accent); color: #0b1020; font-weight: 700; }
+  #err { color: var(--red); min-height: 18px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Par<span>ley</span> admin</div>
+  <span class="phase" id="phase">…</span>
+  <span class="meta" id="room"></span>
+  <div style="flex:1"></div>
+  <a href="/" target="_blank">Open big screen ↗</a>
+</header>
+<main>
+  <div>
+    <div class="card">
+      <h2>Join by QR</h2>
+      <img class="qr" id="qr" alt="Join QR code">
+      <div class="meta" style="text-align:center;margin-top:6px" id="joinUrl"></div>
+      <div class="meta" style="margin-top:6px">Phones must be on the same Wi-Fi as this laptop. If the venue Wi-Fi blocks that, use a phone hotspot.</div>
+    </div>
+    <div class="card">
+      <h2>Run the room</h2>
+      <div class="row"><button id="next">Next phase ▸</button><button id="run" class="primary">Run all ▸▸</button></div>
+      <div class="row" style="margin-top:8px"><button id="reset">Reset room</button></div>
+      <label><input type="checkbox" id="human" style="width:auto"> Human bidding: 10 s countdown before each item, 1 s per clock tick, so people can bid from their phones</label>
+      <div id="err"></div>
+      <table id="people" style="margin-top:8px"></table>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Room editor</h2>
+      <div class="row">
+        <select id="tpl"></select>
+        <button id="loadTpl">Edit this room</button>
+        <button id="blank">New blank room</button>
+      </div>
+      <label>Title</label><input id="title">
+      <label>Instructions everyone sees (rules, the will, deadlines)</label><textarea id="will"></textarea>
+      <label>Extra notes (one per line)</label><textarea id="notes"></textarea>
+      <label>People (comma-separated names; each gets a phone seat)</label><input id="names" placeholder="Ana, Ben, Cara">
+      <div class="row">
+        <div><label>Rating needed to contest</label><input id="thr" type="number" min="5" max="10"></div>
+        <div><label>Top-up over credits (%)</label><input id="topup" type="number" min="0" max="200"></div>
+        <div><label>Max items rated 9–10</label><input id="maxtop" type="number" min="1" max="10"></div>
+      </div>
+      <h2 style="margin-top:14px">Items</h2>
+      <div class="meta">Leave the value empty and give a purchase price + age to let the Appraiser estimate it. Ownership in %: equal by default.</div>
+      <div style="overflow-x:auto"><table id="itemsTbl"></table></div>
+      <div class="row" style="margin-top:8px"><button id="addItem">+ Add item</button><button id="save" class="primary">Save & open room</button></div>
+      <div id="saveMsg" class="meta"></div>
+    </div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x";
+const CATS = ["furniture", "kitchen", "electronics", "decor", "jewelry", "collectibles", "vehicle", "other"];
+let S = null, items = [], editId = null;
+
+async function api(method, path, body) {
+  const r = await fetch(path, {method, headers: {"Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { $("err").textContent = j.detail || r.statusText; throw new Error(j.detail); }
+  $("err").textContent = ""; return j;
+}
+
+function people() {
+  return $("names").value.split(",").map(s => s.trim()).filter(Boolean).map(n => ({id: slug(n), name: n}));
+}
+
+function loadIntoEditor(sc) {
+  editId = sc.id && sc.id.startsWith("room-") ? sc.id : null;
+  $("title").value = sc.title || ""; $("will").value = sc.will || ""; $("notes").value = (sc.notes || []).join("\n");
+  $("names").value = sc.participants.map(p => p.name).join(", ");
+  $("thr").value = sc.contest_threshold ?? 7; $("topup").value = Math.round((sc.topup_pct ?? 0.5) * 100); $("maxtop").value = sc.max_top_ratings ?? 3;
+  const name = Object.fromEntries(sc.participants.map(p => [p.id, p.name]));
+  items = sc.items.map(it => ({...it, sale: (sc.sale_estimates || {})[it.id] ?? "",
+    pct: Object.fromEntries(Object.entries(it.shares).map(([pid, v]) => [slug(name[pid] || pid), Math.round(v * 1000) / 10])),
+    locked: it.locked_to ? slug(name[it.locked_to] || it.locked_to) : ""}));
+  renderItems();
+}
+
+function renderItems() {
+  const ps = people();
+  $("itemsTbl").innerHTML = `<tr><th></th><th>Name</th><th>Category</th><th>Value $</th><th>Bought $</th><th>Age</th>
+    ${ps.map(p => `<th>${esc(p.name)} %</th>`).join("")}<th>Will gives to</th><th>If unwanted, sells for $</th><th></th></tr>` +
+    items.map((it, i) => `<tr>
+      <td style="width:46px"><input data-i="${i}" data-k="emoji" value="${esc(it.emoji || "")}" maxlength="4"></td>
+      <td><input data-i="${i}" data-k="name" value="${esc(it.name || "")}"></td>
+      <td><select data-i="${i}" data-k="category">${CATS.map(c => `<option ${c === it.category ? "selected" : ""}>${c}</option>`).join("")}</select></td>
+      <td><input data-i="${i}" data-k="market_value" type="number" value="${it.market_value ?? ""}"></td>
+      <td><input data-i="${i}" data-k="purchase_price" type="number" value="${it.purchase_price ?? ""}"></td>
+      <td style="width:60px"><input data-i="${i}" data-k="age_years" type="number" value="${it.age_years ?? ""}"></td>
+      ${ps.map(p => `<td style="width:70px"><input data-i="${i}" data-pct="${p.id}" type="number" placeholder="eq" value="${it.pct?.[p.id] ?? ""}"></td>`).join("")}
+      <td><select data-i="${i}" data-k="locked"><option value="">—</option>${ps.map(p => `<option value="${p.id}" ${it.locked === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></td>
+      <td style="width:90px"><input data-i="${i}" data-k="sale" type="number" value="${it.sale ?? ""}"></td>
+      <td><button data-del="${i}">✕</button></td></tr>`).join("");
+  $("itemsTbl").querySelectorAll("[data-k]").forEach(el => el.oninput = el.onchange = () => { items[+el.dataset.i][el.dataset.k] = el.value; });
+  $("itemsTbl").querySelectorAll("[data-pct]").forEach(el => el.oninput = () => {
+    const it = items[+el.dataset.i]; it.pct = it.pct || {}; it.pct[el.dataset.pct] = el.value; });
+  $("itemsTbl").querySelectorAll("[data-del]").forEach(el => el.onclick = () => { items.splice(+el.dataset.del, 1); renderItems(); });
+}
+
+function buildScenario() {
+  const ps = people();
+  if (!ps.length) throw new Error("Add at least one person.");
+  const num = v => v === "" || v == null ? null : Number(v);
+  const sale = {};
+  const outItems = items.filter(it => (it.name || "").trim()).map((it, k) => {
+    const id = it.id || slug(it.name) + "-" + k;
+    let shares = Object.fromEntries(ps.map(p => [p.id, Number(it.pct?.[p.id]) || 0]).filter(([, v]) => v > 0));
+    const total = Object.values(shares).reduce((a, b) => a + b, 0);
+    shares = total > 0 ? Object.fromEntries(Object.entries(shares).map(([p, v]) => [p, v / total]))
+                       : Object.fromEntries(ps.map(p => [p.id, 1 / ps.length]));
+    if (num(it.sale)) sale[id] = num(it.sale);
+    const mv = num(it.market_value);
+    return {id, name: it.name.trim(), category: it.category || "other", emoji: it.emoji || "", description: it.description || "",
+            market_value: mv, value_source: mv != null ? (it.value_source || "manual") : "",
+            confidence: mv != null ? (it.confidence || "medium") : "low",
+            purchase_price: num(it.purchase_price), age_years: num(it.age_years), shares, locked_to: it.locked || null};
+  });
+  if (!outItems.length) throw new Error("Add at least one item.");
+  return {id: editId || "", title: $("title").value.trim() || "Untitled room", kind: "a shared-items split",
+          will: $("will").value.trim(), notes: $("notes").value.split("\n").map(s => s.trim()).filter(Boolean),
+          participants: ps, items: outItems, sale_estimates: sale,
+          contest_threshold: Number($("thr").value) || 7, topup_pct: (Number($("topup").value) || 0) / 100, max_top_ratings: Number($("maxtop").value) || 3};
+}
+
+$("names").onchange = renderItems;
+$("addItem").onclick = () => { items.push({emoji: "📦", name: "", category: "other", pct: {}}); renderItems(); };
+$("blank").onclick = () => loadIntoEditor({title: "", will: "", notes: [], participants: [{id: "alex", name: "Alex"}, {id: "sam", name: "Sam"}], items: []});
+$("loadTpl").onclick = async () => loadIntoEditor(await api("GET", "/scenario_raw/" + $("tpl").value));
+$("save").onclick = async () => {
+  try {
+    const sc = buildScenario();
+    if (S && sc.participants.length > S.slots) $("saveMsg").innerHTML = `<span class="bad">Only ${S.slots} phone seats are running; extra people get an in-process agent with no phone page.</span>`;
+    const r = await api("POST", "/admin/room", sc);
+    editId = r.id; $("saveMsg").innerHTML = `<span class="ok">Saved as ${esc(r.id)} and opened. Phones can join now.</span>`;
+    refreshTemplates(r.id);
+  } catch (e) { $("saveMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+};
+$("next").onclick = () => api("POST", "/next");
+$("run").onclick = () => api("POST", "/run");
+$("reset").onclick = () => S && S.scenario && api("POST", "/scenario/" + S.scenario.id);
+$("human").onchange = () => api("POST", "/admin/settings", {human_bidding: $("human").checked});
+
+async function refreshTemplates(select) {
+  const list = await api("GET", "/scenarios");
+  $("tpl").innerHTML = list.map(x => `<option ${x === select ? "selected" : ""}>${esc(x)}</option>`).join("");
+}
+
+async function poll() {
+  try {
+    S = await (await fetch("/state")).json();
+    $("phase").textContent = S.phase + (S.busy ? " …" : "");
+    $("room").textContent = S.scenario ? S.scenario.title : "";
+    $("next").disabled = $("run").disabled = S.busy || S.phase === "REVEAL";
+    $("human").checked = S.human_bidding;
+    if (S.scenario) {
+      $("people").innerHTML = `<tr><th>Person</th><th>Phone</th><th>Ratings</th><th>Fair?</th></tr>` + S.scenario.participants.map(p => `<tr>
+        <td><b>${esc(p.name)}</b></td><td>${p.agent_url ? (S.joined[p.id] ? '<span class="ok">joined</span>' : "not yet") : '<span class="bad">no seat</span>'}</td>
+        <td>${S.intake[p.id] ? '<span class="ok">✔ in</span>' : "waiting"}</td>
+        <td>${S.verdict ? (S.verdict.attestations[p.id] ? "✅" : "⚠️") : ""}</td></tr>`).join("");
+    }
+  } catch {}
+  setTimeout(poll, 1000);
+}
+
+(async () => {
+  const room = await api("GET", "/room");
+  $("qr").src = "/qr.svg?data=" + encodeURIComponent(room.join_url);
+  $("joinUrl").textContent = room.join_url;
+  const s = await (await fetch("/state")).json();
+  await refreshTemplates(s.scenario && s.scenario.id);
+  if (s.scenario) loadIntoEditor(await api("GET", "/scenario_raw/" + s.scenario.id));
+  poll();
+})();
+</script>
+</body>
+</html>

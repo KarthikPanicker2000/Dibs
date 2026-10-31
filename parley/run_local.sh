@@ -15,7 +15,8 @@ trap cleanup EXIT INT TERM
 # AGENT1_URL / AGENT2_URL / AGENT3_URL point a slot at a remote agent (e.g. on Maritime);
 # slots without one get a local agent process on :800N.
 urls=()
-for i in 1 2 3; do
+SLOTS="${AGENT_SLOTS:-6}"   # phone seats; a room uses the first N
+for i in $(seq 1 "$SLOTS"); do
   var="AGENT${i}_URL"
   if [ -n "${!var:-}" ]; then
     urls+=("${!var}")

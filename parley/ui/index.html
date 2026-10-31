@@ -114,6 +114,11 @@
   <div class="col"><h2>Items</h2><div class="items" id="items"></div></div>
   <div class="col"><h2>Live feed</h2><div class="feed" id="feed"></div></div>
   <div class="col">
+    <div id="joinBox" hidden style="text-align:center;margin-bottom:14px">
+      <h2>Scan to join</h2>
+      <img id="joinQr" alt="Join QR" style="background:#fff;border-radius:10px;padding:6px;width:190px">
+      <div class="meta" id="joinUrl"></div>
+    </div>
     <h2>Participants</h2><div class="people" id="people"></div>
     <div id="auction"></div>
   </div>
@@ -163,6 +168,7 @@ function render() {
   $("setup").innerHTML = (s.scenario.will ? `<div class="will"><b>The will:</b> “${esc(s.scenario.will)}”</div>` : "")
     + `<div>${s.scenario.notes.map(esc).join("<br>")}</div>`;
 
+  $("joinBox").hidden = !["SETUP", "APPRAISE", "INTAKE"].includes(s.phase);
   renderItems(s); renderFeed(s); renderPeople(s); renderAuction(s); renderVerdict(s);
 }
 
@@ -226,7 +232,7 @@ function flash() {
 
 function renderPeople(s) {
   $("people").innerHTML = s.scenario.participants.map(p => {
-    const link = agentLink(p.agent_url);
+    const link = p.agent_url ? "/join/" + encodeURIComponent(p.id) : "";
     const cap = s.caps[p.id], rem = s.remaining[p.id];
     const credit = cap != null ? `<div class="bar"><i style="width:${Math.max(0, 100 * rem / cap)}%"></i></div>
       <div class="meta">Spend cap: ${money(Math.max(0, rem))} left of ${money(cap)} (credits ${money(s.credits[p.id])})</div>`
@@ -309,6 +315,10 @@ async function poll() {
 $("next").onclick = () => api("POST", "/next");
 $("run").onclick = () => api("POST", "/run");
 $("load").onclick = async () => { verdictShown = false; await api("POST", "/scenario/" + $("scenario").value); };
+fetch("/room").then(r => r.json()).then(room => {
+  $("joinQr").src = "/qr.svg?data=" + encodeURIComponent(room.join_url);
+  $("joinUrl").textContent = room.join_url.replace(/^https?:\/\//, "");
+});
 fetch("/scenarios").then(r => r.json()).then(list => {
   $("scenario").innerHTML = list.map(x => `<option value="${x}">${x}</option>`).join("");
   poll();
