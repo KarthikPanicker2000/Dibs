@@ -16,11 +16,7 @@
 <div class="meta">Parley · join the room</div>
 <h1 id="title">Loading…</h1>
 <div id="will"></div>
-<p class="meta" id="how">Who are you? Tap your name. Your phone then talks only to your own private agent.</p>
-<div id="nameBox" hidden style="margin:10px 0">
-  <input id="myname" maxlength="30" placeholder="Your name" autocomplete="given-name"
-         style="width:100%;box-sizing:border-box;padding:14px;font-size:18px;border-radius:12px;border:1px solid #2a3342;background:#0b0f15;color:#e6edf3">
-</div>
+<p class="meta">Who are you? Tap your name. Your phone then talks only to your own private agent.</p>
 <div id="seats"></div>
 <script>
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -29,17 +25,8 @@ async function load() {
   if (!s.scenario) { setTimeout(load, 2000); return; }
   document.getElementById("title").textContent = s.scenario.title;
   document.getElementById("will").innerHTML = s.scenario.will ? `<div class="will">${esc(s.scenario.will)}</div>` : "";
-  const selfNamed = s.scenario.self_named;
-  document.getElementById("nameBox").hidden = !selfNamed;
-  if (selfNamed) document.getElementById("how").textContent = "Type your name, then tap a free seat. Your phone then talks only to your own private agent.";
   document.getElementById("seats").innerHTML = s.scenario.participants.map(p =>
-    `<a class="seat" data-pid="${esc(p.id)}" href="/join/${encodeURIComponent(p.id)}">${selfNamed && !s.joined[p.id] ? "Seat: " : ""}${esc(p.name)}<span>${p.agent_url ? (s.joined[p.id] ? "taken · tap to rejoin" : "open seat") : "no phone agent"}</span></a>`).join("");
-  document.querySelectorAll("a.seat").forEach(a => a.onclick = e => {
-    if (!selfNamed) return;
-    const n = document.getElementById("myname").value.trim();
-    if (!n && !s.joined[a.dataset.pid]) { e.preventDefault(); document.getElementById("myname").focus(); document.getElementById("myname").placeholder = "Type your name first"; return; }
-    if (n) a.href = `/join/${encodeURIComponent(a.dataset.pid)}?name=${encodeURIComponent(n)}`;
-  });
+    `<a class="seat" href="/join/${encodeURIComponent(p.id)}">${esc(p.name)}<span>${p.agent_url ? (s.joined[p.id] ? "joined · tap to rejoin" : "open seat") : "no phone agent"}</span></a>`).join("");
 }
 load();
 </script>

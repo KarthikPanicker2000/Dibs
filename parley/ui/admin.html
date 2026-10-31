@@ -72,7 +72,6 @@
       <label>Instructions everyone sees (rules, the will, deadlines)</label><textarea id="will"></textarea>
       <label>Extra notes (one per line)</label><textarea id="notes"></textarea>
       <label>People (comma-separated names; each gets a phone seat)</label><input id="names" placeholder="Ana, Ben, Cara">
-      <label><input type="checkbox" id="selfNamed" style="width:auto"> Let people type their own name when they join (names above are just seat placeholders, e.g. Roommate 1, Roommate 2)</label>
       <div class="row">
         <div><label>Rating needed to contest</label><input id="thr" type="number" min="5" max="10"></div>
         <div><label>Top-up over credits (%)</label><input id="topup" type="number" min="0" max="200"></div>
@@ -108,7 +107,6 @@ function loadIntoEditor(sc) {
   editId = sc.id && sc.id.startsWith("room-") ? sc.id : null;
   $("title").value = sc.title || ""; $("will").value = sc.will || ""; $("notes").value = (sc.notes || []).join("\n");
   $("names").value = sc.participants.map(p => p.name).join(", ");
-  $("selfNamed").checked = !!sc.self_named;
   $("thr").value = sc.contest_threshold ?? 7; $("topup").value = Math.round((sc.topup_pct ?? 0.5) * 100); $("maxtop").value = sc.max_top_ratings ?? 3;
   const name = Object.fromEntries(sc.participants.map(p => [p.id, p.name]));
   items = sc.items.map(it => ({...it, sale: (sc.sale_estimates || {})[it.id] ?? "",
@@ -204,7 +202,7 @@ function buildScenario() {
   if (!outItems.length) throw new Error("Add at least one item.");
   return {id: editId || "", title: $("title").value.trim() || "Untitled room", kind: "a shared-items split",
           will: $("will").value.trim(), notes: $("notes").value.split("\n").map(s => s.trim()).filter(Boolean),
-          participants: ps, items: outItems, sale_estimates: sale, self_named: $("selfNamed").checked,
+          participants: ps, items: outItems, sale_estimates: sale,
           contest_threshold: Number($("thr").value) || 7, topup_pct: (Number($("topup").value) || 0) / 100, max_top_ratings: Number($("maxtop").value) || 3};
 }
 
